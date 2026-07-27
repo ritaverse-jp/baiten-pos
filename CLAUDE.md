@@ -13,7 +13,9 @@
 
 ## 現在の状態
 
-未実装。`docs/design.md` 7章の実装タスク1（プロジェクト雛形の作成）から着手する段階。下記「コマンド」節は雛形作成後に有効になる。
+`docs/design.md` 7章の実装タスクのうち、**タスク1（プロジェクト雛形）まで完了**。次はタスク2（ドメイン型定義）。
+
+雛形の実体は Vite 8 + React 19 + TypeScript 7。`src/` 配下のディレクトリは設計 3.1 の構成で作成済みだが、`app/` 以外はまだ空（`.gitkeep` のみ）。
 
 ## 技術スタック（確定・変更不可）
 
@@ -107,15 +109,21 @@ docs/         要件定義
 
 ```bash
 npm run dev            # 開発サーバー
-npm run build          # 本番ビルド
+npm run build          # 本番ビルド（型チェック込み）
+npm run preview        # ビルド結果の確認。Service Worker の確認はこちら
 npm run test           # 単体テスト（domain 層中心）
-npm run typecheck      # tsc --noEmit
+npm run typecheck      # tsc -b
+npm run lint           # oxlint
 
-cd gas && npx clasp push     # GAS へ反映
+cd gas && npx clasp push     # GAS へ反映（gas/ はタスク7で作成）
 cd gas && npx clasp deploy   # Web アプリとして再デプロイ
 ```
 
+**Service Worker は開発サーバーでは無効**にしてある（`vite.config.ts` の `devOptions.enabled: false`）。古いキャッシュで変更が反映されない事故を避けるため。オフライン動作の確認は `npm run build && npm run preview` で行う。
+
 GAS を再デプロイすると Web アプリ URL のバージョンが変わる場合がある。既存端末の設定 URL に影響しないよう、デプロイは既存デプロイの更新として行うこと。
+
+TypeScript 7 では `baseUrl` が削除されている。パスエイリアスは `paths` に相対パス（`"@/*": ["./src/*"]`）で書く。
 
 ## 規約
 

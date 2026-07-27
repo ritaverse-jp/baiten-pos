@@ -1,0 +1,51 @@
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Hiragino Sans',
+    'Noto Sans JP',
+    sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  color: #111827;
+  background-color: #f3f4f6;
+  -webkit-text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  /* 会計操作中のスクロールバウンス・長押し選択・タップ時の灰色ハイライトを抑止する */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* 要件定義 7.3：主要ボタンのタップ領域は 44×44pt 以上 */
+  min-width: 44px;
+  min-height: 44px;
+}
+
+button,
+label {
+  user-select: none;
+}
+
+/* 金額は等幅で桁を揃える */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
