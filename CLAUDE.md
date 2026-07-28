@@ -13,13 +13,18 @@
 
 ## 現在の状態
 
-`docs/design.md` 7章の実装タスクのうち、**タスク4（伝票操作ロジック）まで完了**。次はタスク5（採番ロジック）。
+`docs/design.md` 7章の実装タスクのうち、**タスク5（採番ロジック）まで完了**。次はタスク6（IndexedDB 層。`products`・`categories`・`currentTicket`・`sales`・`pendingQueue`・`config` の5テーブルを `data/db/schema.ts` に追加する）。
 
 実体は Vite 8 + React 19 + TypeScript 7。
 
 - `src/domain/types.ts` — シート列・API・Dexie の型。**新しい型を足す前にまずここを見ること**（同義の型を二重定義しやすい）
 - `src/domain/calc.ts` — 金額計算と入力値検証。**金額の計算をここ以外に書かないこと。** 画面やストアで `price * qty` を直に書くと割引の適用単位を間違える
 - `src/domain/ticket.ts` — 伝票操作（追加・個数変更・行分割・割引設定・削除）。すべて `{ok, lines}` 形式で返す純粋関数。**伝票の更新は画面から直接配列操作せず、必ずここの関数を経由すること**。行の一意キーは `lineId` であり `productNo` ではない（「行を分ける」で同一商品が複数行になるため）
+- `src/domain/saleNumber.ts` — 会計番号の生成・パース（純粋関数、日時以外の外部依存なし）
+- `src/data/db/schema.ts` — Dexie スキーマ本体。**データベースは1つに統一する。** 新しいテーブルは別の Dexie インスタンスを作らずここに追加すること
+- `src/data/sync/counter.ts` — 連番カウンタの get-and-increment。`db.transaction('rw', db.counters, ...)` を自前で開くが、`db.counters` を含む外側のトランザクションから呼ばれた場合はそれに参加する（Dexie のトランザクション伝播）。**タスク15の会計確定処理はこれを利用し、採番と会計データの保存を1つの外側トランザクションにまとめること**（不変条件9）
+
+テストで IndexedDB を使う場合は `fake-indexeddb/auto`（`src/test/setup.ts` で読み込み済み）が有効なので追加の対応は不要。
 
 `src/` 配下の他のディレクトリは設計 3.1 の構成で用意済みだが、まだ空。
 
