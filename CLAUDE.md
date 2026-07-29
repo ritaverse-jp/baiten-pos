@@ -109,6 +109,9 @@ docs/         要件定義
 
 ## GAS 固有の注意
 
+- **コード管理は clasp。Apps Script エディタで直接編集しない。** `gas/` はこのリポジトリの一部として git 管理する
+- **言語は素の JavaScript。TypeScript は使わない。** GAS は ES モジュール（import/export）を解決できず、バンドラーを組むほどの規模でもないため。複数の `.js` ファイルが GAS のグローバルスコープを共有する前提でファイルを分ける（設計 2.9 のファイル構成）
+- Apps Script プロジェクトは**コンテナバインド型**（正データのスプレッドシートに紐づく）。スタンドアロン型にしてスプレッドシートIDを持ち回る必要はない
 - **CORS**：GAS はプリフライト（OPTIONS）に応答できない。POST は `Content-Type: text/plain` で JSON 文字列を送る単純リクエストに限定し、GAS 側で `JSON.parse(e.postData.contents)` する。`application/json` を指定すると必ず失敗する
 - 認証つきの呼び出しは GET を使わず POST に寄せる。GET だとトークンが URL に載り実行ログに残る
 - ロックは `LockService.getScriptLock()` に統一する。`getDocumentLock()` と混在させると排他が効かない

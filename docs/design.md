@@ -249,6 +249,26 @@ finally → releaseLock()
 - **「チェックと書き込みを同一ロック内で行う」ことが本質。** 重複チェックをロック外に出すと check-then-act の競合が生じる
 - タイムアウト時は `LOCK_TIMEOUT` を返すだけにし、リトライはクライアントの同期エンジンに任せる。GAS 側で待ち続けると 6 分の実行時間制限を圧迫する
 
+### 2.9 コード管理方針【確定】
+
+GAS 側のコードは Apps Script エディタ（ブラウザ）で直接編集せず、**clasp を使ってこのリポジトリの `gas/` ディレクトリで管理する**。フロントと同じ git 履歴・同じレビュー動線に乗せるため。
+
+**言語は TypeScript ではなく素の JavaScript とする。** GAS のランタイムは `import`/`export`（ES モジュール）を解決する仕組みを持たない。clasp の TypeScript サポートはファイル単位の構文変換に留まり、複数ファイルにまたがる import をバンドルしない。エンドポイント13本程度の規模のためだけに esbuild 等のバンドラーを追加導入するのは過剰と判断し、GAS 伝統の「複数の `.js` ファイルがグローバルスコープを共有する」方式をそのまま使う。型の整合性は本章の入出力定義と `domain/types.ts` を見比べながら手で合わせる。
+
+**ファイル構成**（2.1 のエンドポイント区分に沿って分割する）：
+
+| ファイル | 内容 |
+| --- | --- |
+| `Code.js` | `doGet`/`doPost` ルーター、共通レスポンス整形、認証・端末状態検証の共通処理 |
+| `SheetInit.js` | スプレッドシートのタブ雛形生成（タスク7） |
+| `Masters.js` | `getMasters` |
+| `Sales.js` | `appendSales`・`getSalesHistory`・`cancelSale` |
+| `Auth.js` | `registerTerminal`・`login`・`refreshToken`、トークン検証 |
+| `Products.js` / `Categories.js` | `saveProduct`/`deleteProduct`、`saveCategory`/`deleteCategory` |
+| `Menu.js` | スプレッドシートのカスタムメニュー（端末無効化・全端末失効・キャッシュ破棄。タスク10） |
+
+**Apps Script プロジェクトの種類：コンテナバインド型を採用する。** 正データのスプレッドシートを開き「拡張機能 → Apps Script」から作成する、そのスプレッドシートに紐づいたプロジェクト。`SpreadsheetApp.getActiveSpreadsheet()` が常に正データのシートを指すため、スプレッドシートIDをコードや Script Properties に持つ必要がない。このGASは「常に1つのスプレッドシートだけを操作する」用途に限定されるため、ID を都度指定するスタンドアロン型にする理由がない。
+
 ---
 
 ## 3. フロントエンド構成
