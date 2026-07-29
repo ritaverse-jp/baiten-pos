@@ -36,6 +36,8 @@ function handleRequest_(e, method) {
         return respondOk_({ pong: true, now: new Date().toISOString() })
       case 'getMasters':
         return respondOk_(getMasters(params))
+      case 'appendSales':
+        return respondOk_(appendSales(params))
       default:
         throw new ApiError('VALIDATION_ERROR', '不明な action です: ' + action)
     }
