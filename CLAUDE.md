@@ -13,7 +13,9 @@
 
 ## 現在の状態
 
-`docs/design.md` 7章の実装タスクのうち、**タスク6（IndexedDB 層）まで完了**。次はタスク7（GAS：シート初期化＋`getMasters`）。
+`docs/design.md` 7章の実装タスクのうち、**タスク7（GAS：シート初期化＋`getMasters`）まで完了**。次はタスク8（GAS：`appendSales`）。
+
+GAS はデプロイ済み（コンテナバインド型、Webアプリとして公開）。Webアプリ URL はユーザーが把握しており、`.clasp.json`（gitignore 済み）に紐づく。トークン認証が必要な経路（`getMasters` の実データ取得）は `registerTerminal`（タスク9）が無いため未検証。`ping`・認証拒否パス・未知 action の3つは実デプロイに対する curl で確認済み。
 
 実体は Vite 8 + React 19 + TypeScript 7。
 
@@ -119,6 +121,8 @@ docs/         要件定義
 - ロックの解放は必ず `finally` で行う
 - 売上ログは月次タブ `売上ログ_YYYYMM`。当月タブが無ければ GAS が自動生成する
 - シークレット（PIN ハッシュ・トークンハッシュ・トークンエポック）は Script Properties に置く。スプレッドシート上には置かない（店舗スタッフがシートを閲覧できるため）
+- 全ての書き込み系の前に `ensureCoreSheets()`（`SheetInit.js`）を呼び、静的タブ（商品マスタ・カテゴリ・端末・操作ログ）の存在を保証する。冪等なので毎回呼んでよい
+- **デプロイした Web アプリを `curl` で疎通確認するとき、`curl -L` でリダイレクトを自動追従させると POST が壊れる。** GAS の Web アプリは応答を `script.googleusercontent.com` への 302 リダイレクトとして返すが、`-L` に `-d`（POSTボディ）を組み合わせると、リダイレクト先への再送でボディが壊れて Google 側の汎用エラーページが返る（`--post302 --post303` を足しても同様に壊れる）。**確実な方法：`curl -D -` などで一旦 `Location` ヘッダを取り出し、そのURLに対して改めて単純な `GET` を投げる。** ヘビーな処理（doGet/doPost の実行）は最初のリクエストで完了しており、リダイレクト先は結果を返すだけなので、2段階目は常に GET でよい（元のリクエストが POST でも）
 
 ## UI の制約
 
