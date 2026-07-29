@@ -1,5 +1,8 @@
 /**
- * `appendSales` エンドポイント。docs/design.md 2.4 参照。
+ * `appendSales`・`getTodayMaxSeq` エンドポイント。docs/design.md 2.4・2.5 参照。
+ *
+ * `getTodayMaxSeq` は design 2.9 のファイル表では明記していなかったが、
+ * 売上ログのタブ・列を直接読む点で appendSales と関心が近いためここに置く。
  *
  * `getSalesHistory`・`cancelSale`（design 2.9 のファイル構成でこのファイルに
  * 割り当て済み）は未実装。対応するタスクで追加する。
@@ -164,4 +167,36 @@ function updateTerminalLastSynced_(terminalCode) {
       return
     }
   }
+}
+
+/**
+ * 自端末・指定日の最大連番を返す。IndexedDB が消えた端末がカウンタを
+ * 復元するために使う（design 2.5・5.3）。ロック不要（読み取り専用）。
+ */
+function getTodayMaxSeq(params) {
+  var terminalCode = requireAuth_(params)
+  var date = params && params.date
+  if (!date || !/^\d{8}$/.test(date)) {
+    throw new ApiError('VALIDATION_ERROR', 'date は YYYYMMDD 形式で指定してください')
+  }
+
+  var tabName = SALES_SHEET_PREFIX + date.slice(0, 6)
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName)
+  var prefix = date + '-' + terminalCode
+  var maxSeq = 0
+
+  if (sheet) {
+    var lastRow = sheet.getLastRow()
+    if (lastRow >= 2) {
+      var saleIds = sheet.getRange(2, 3, lastRow - 1, 1).getValues() // C列: 会計番号
+      saleIds.forEach(function (row) {
+        var saleId = row[0]
+        if (typeof saleId !== 'string' || saleId.indexOf(prefix) !== 0) return
+        var seq = parseInt(saleId.slice(prefix.length), 10)
+        if (!isNaN(seq) && seq > maxSeq) maxSeq = seq
+      })
+    }
+  }
+
+  return { maxSeq: maxSeq }
 }

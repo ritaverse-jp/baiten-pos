@@ -38,6 +38,14 @@ function handleRequest_(e, method) {
         return respondOk_(getMasters(params))
       case 'appendSales':
         return respondOk_(appendSales(params))
+      case 'getTodayMaxSeq':
+        return respondOk_(getTodayMaxSeq(params))
+      case 'registerTerminal':
+        return respondOk_(registerTerminal(params))
+      case 'login':
+        return respondOk_(login(params))
+      case 'refreshToken':
+        return respondOk_(refreshToken(params))
       default:
         throw new ApiError('VALIDATION_ERROR', '不明な action です: ' + action)
     }
@@ -97,10 +105,6 @@ ApiError.prototype.constructor = ApiError
  * トークン → ハッシュ照合 → 端末コード特定 → 端末タブの状態 → 有効期限 → トークンエポック
  *
  * 成功時は検証済みの端末コードを返す。失敗時は該当する ApiError を投げる。
- *
- * 現時点（タスク7）では registerTerminal（タスク9）がまだ存在せず、
- * トークンを発行する手段がないため、あらゆる呼び出しが UNAUTHORIZED になる
- * のが正しい挙動である。
  */
 function requireAuth_(params) {
   var token = params && params.apiToken
@@ -116,7 +120,7 @@ function requireAuth_(params) {
   }
 
   var record = JSON.parse(raw)
-  if (hashToken_(token) !== record.hash) {
+  if (sha256Hex_(token) !== record.hash) {
     throw new ApiError('UNAUTHORIZED', 'トークンが無効です')
   }
 
@@ -136,13 +140,37 @@ function requireAuth_(params) {
   return terminalCode
 }
 
-function hashToken_(token) {
-  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
+/**
+ * SHA-256 の16進ハッシュ。トークン・PIN の両方の保存に使う汎用関数
+ * （design 6.2：どちらも実体を保存せずハッシュのみ保持する）。
+ */
+function sha256Hex_(value) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value)
   return bytes
     .map(function (b) {
       return ((b < 0 ? b + 256 : b) & 0xff).toString(16).padStart(2, '0')
     })
     .join('')
+}
+
+/**
+ * `端末` タブから該当行を探す。見つからなければ null。
+ * `getTerminalStatus_`・`Auth.js` の各エンドポイントから共通で使う。
+ */
+function findTerminalRow_(terminalCode) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TERMINAL_SHEET_NAME)
+  if (!sheet) return null
+
+  var lastRow = sheet.getLastRow()
+  if (lastRow < 2) return null
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 4).getValues() // A:コード B:名前 C:登録日時 D:状態
+  for (var i = 0; i < values.length; i++) {
+    if (values[i][0] === terminalCode) {
+      return { rowIndex: i + 2, name: values[i][1], status: values[i][3] }
+    }
+  }
+  return null
 }
 
 /**
@@ -156,29 +184,57 @@ function getTerminalStatus_(terminalCode) {
   var cached = cache.get(cacheKey)
   if (cached !== null) return cached
 
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TERMINAL_SHEET_NAME)
-  var status = '無効'
-  if (sheet) {
-    var lastRow = sheet.getLastRow()
-    if (lastRow >= 2) {
-      var values = sheet.getRange(2, 1, lastRow - 1, 4).getValues() // A:端末コード, D:状態
-      for (var i = 0; i < values.length; i++) {
-        if (values[i][0] === terminalCode) {
-          status = values[i][3]
-          break
-        }
-      }
-    }
-  }
+  var terminal = findTerminalRow_(terminalCode)
+  var status = terminal ? terminal.status : '無効'
 
   cache.put(cacheKey, status, TERMINAL_STATUS_CACHE_SECONDS)
   return status
 }
 
 /**
- * 端末状態のキャッシュを即時破棄する。カスタムメニューからの無効化操作・
- * `端末` タブの手編集（onEdit）から呼ぶ想定（design 6.4。タスク10で配線）。
+ * 端末状態のキャッシュを即時破棄する。カスタムメニューからの無効化操作
+ * （design 6.4。タスク10で配線）と、下の `onEdit`（本ファイルで実装済み）
+ * の両方から呼ばれる。
  */
 function invalidateTerminalStatusCache_(terminalCode) {
   CacheService.getScriptCache().remove(TERMINAL_STATUS_CACHE_PREFIX + terminalCode)
+}
+
+/**
+ * シンプルトリガー。`端末` タブが手編集された行の端末コードについて、
+ * 状態キャッシュを即時破棄する（design 6.4 の「シートを手編集」経路）。
+ * コンテナバインド型のプロジェクトでは `onEdit` という名前の関数を置くだけで
+ * 自動的に有効になり、追加のトリガー登録は不要。
+ *
+ * 複数行にまたがる編集（貼り付け等）にも対応する。
+ *
+ * 【重要】GAS はスクリプト全体で `onEdit` という名前の関数を1つしか実行できない。
+ * 将来 `端末` タブ以外の編集にも反応させたくなった場合は、この関数の中に
+ * 分岐を足すこと。新しい `onEdit` を別ファイルに作らない。
+ */
+function onEdit(e) {
+  if (!e || !e.range) return
+  var sheet = e.range.getSheet()
+  if (sheet.getName() !== TERMINAL_SHEET_NAME) return
+
+  var startRow = e.range.getRow()
+  var numRows = e.range.getNumRows()
+
+  for (var offset = 0; offset < numRows; offset++) {
+    var row = startRow + offset
+    if (row < 2) continue // ヘッダー行は無視
+    var terminalCode = sheet.getRange(row, 1).getValue()
+    if (terminalCode) invalidateTerminalStatusCache_(terminalCode)
+  }
+}
+
+/**
+ * `操作ログ` タブへの追記。NF-07（マスタ編集・削除、会計取消の操作ログ記録）。
+ * 単発の管理操作向けであり、appendSales のような高頻度バッチではないため
+ * `appendRow` で十分（design 2.4 の setValues 一括方針は対象外）。
+ */
+function logOperation_(terminalCode, type, target, detail) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('操作ログ')
+  if (!sheet) return
+  sheet.appendRow([new Date().toISOString(), terminalCode, type, target, JSON.stringify(detail || {})])
 }
