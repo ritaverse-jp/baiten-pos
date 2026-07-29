@@ -13,7 +13,7 @@
 
 ## 現在の状態
 
-`docs/design.md` 7章の実装タスクのうち、**タスク5（採番ロジック）まで完了**。次はタスク6（IndexedDB 層。`products`・`categories`・`currentTicket`・`sales`・`pendingQueue`・`config` の5テーブルを `data/db/schema.ts` に追加する）。
+`docs/design.md` 7章の実装タスクのうち、**タスク6（IndexedDB 層）まで完了**。次はタスク7（GAS：シート初期化＋`getMasters`）。
 
 実体は Vite 8 + React 19 + TypeScript 7。
 
@@ -21,12 +21,17 @@
 - `src/domain/calc.ts` — 金額計算と入力値検証。**金額の計算をここ以外に書かないこと。** 画面やストアで `price * qty` を直に書くと割引の適用単位を間違える
 - `src/domain/ticket.ts` — 伝票操作（追加・個数変更・行分割・割引設定・削除）。すべて `{ok, lines}` 形式で返す純粋関数。**伝票の更新は画面から直接配列操作せず、必ずここの関数を経由すること**。行の一意キーは `lineId` であり `productNo` ではない（「行を分ける」で同一商品が複数行になるため）
 - `src/domain/saleNumber.ts` — 会計番号の生成・パース（純粋関数、日時以外の外部依存なし）
-- `src/data/db/schema.ts` — Dexie スキーマ本体。**データベースは1つに統一する。** 新しいテーブルは別の Dexie インスタンスを作らずここに追加すること
+- `src/data/db/schema.ts` — Dexie スキーマ本体。**データベースは1つに統一する。** 新しいテーブルは別の Dexie インスタンスを作らずここに追加すること。テーブルごとのアクセサは `masters.ts`（products・categories）・`currentTicket.ts`・`sales.ts`・`pendingQueue.ts`・`config.ts` に分けている（`counters` のみ排他制御と一体のため `data/sync/counter.ts` に置く）
+- `src/data/db/masters.ts` — 商品・カテゴリキャッシュ。**1件ずつの追加・更新は提供しない。** 常に `replaceProducts`/`replaceCategories` による丸ごと置き換え（GAS からの再取得結果を反映する形のみ。編集自体はオンライン時に GAS 経由で行う）
+- `src/data/db/currentTicket.ts` — 入力中伝票の永続化。DB 固有の主キー（`id: 'current'`）はこの層の外に漏らさない。呼び出し側は `Ticket` 型だけを扱う
+- `src/data/db/pendingQueue.ts` — 未送信キュー。**`removePendingSale` は GAS の受理応答を受け取った後にのみ呼ぶこと**（不変条件17）。`getAllPendingSales` は enqueuedAt 昇順で返す
 - `src/data/sync/counter.ts` — 連番カウンタの get-and-increment。`db.transaction('rw', db.counters, ...)` を自前で開くが、`db.counters` を含む外側のトランザクションから呼ばれた場合はそれに参加する（Dexie のトランザクション伝播）。**タスク15の会計確定処理はこれを利用し、採番と会計データの保存を1つの外側トランザクションにまとめること**（不変条件9）
 
-テストで IndexedDB を使う場合は `fake-indexeddb/auto`（`src/test/setup.ts` で読み込み済み）が有効なので追加の対応は不要。
+テストで IndexedDB を使う場合は `fake-indexeddb/auto`（`src/test/setup.ts` で読み込み済み）が有効なので追加の対応は不要。各アクセサのテストは対象テーブルを `beforeEach` で `clear()` してから実行する（同一 Dexie インスタンスをテスト間で共有しているため）。
 
 `src/` 配下の他のディレクトリは設計 3.1 の構成で用意済みだが、まだ空。
+
+**タスク11（GAS 通信層）着手時に必ず対応すること：** `data/sync/counter.ts` の `ensureMinSeq` と `peekSeq` は実装済みだが、呼び出し元（起動時に当日カウンタの有無を確認し、`getTodayMaxSeq` の応答で補正する処理。設計 5.3）がまだ配線されていない。タスク11でGAS通信層ができたら、このプリミティブを使う起動時フローを実装すること。
 
 ## 技術スタック（確定・変更不可）
 
