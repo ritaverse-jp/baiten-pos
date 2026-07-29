@@ -46,6 +46,14 @@ function handleRequest_(e, method) {
         return respondOk_(login(params))
       case 'refreshToken':
         return respondOk_(refreshToken(params))
+      case 'saveProduct':
+        return respondOk_(saveProduct(params))
+      case 'deleteProduct':
+        return respondOk_(deleteProduct(params))
+      case 'saveCategory':
+        return respondOk_(saveCategory(params))
+      case 'deleteCategory':
+        return respondOk_(deleteCategory(params))
       default:
         throw new ApiError('VALIDATION_ERROR', '不明な action です: ' + action)
     }
@@ -192,21 +200,36 @@ function getTerminalStatus_(terminalCode) {
 }
 
 /**
- * 端末状態のキャッシュを即時破棄する。カスタムメニューからの無効化操作
- * （design 6.4。タスク10で配線）と、下の `onEdit`（本ファイルで実装済み）
- * の両方から呼ばれる。
+ * 端末状態のキャッシュを即時破棄する。カスタムメニューからの操作（Menu.js）と
+ * `onEdit`（本ファイル）の両方から呼ばれる。
  */
 function invalidateTerminalStatusCache_(terminalCode) {
   CacheService.getScriptCache().remove(TERMINAL_STATUS_CACHE_PREFIX + terminalCode)
 }
 
 /**
+ * 端末の無効化を破壊的に行う（design 6.3）。トークンハッシュの Script Property
+ * 自体を削除し、キャッシュも破棄する。フラグ（`端末` タブ D列）を戻すだけでは
+ * アクセスが復活しないようにするための処理であり、状態が `無効` になる経路
+ * （手編集の `onEdit`・カスタムメニューの無効化操作）の両方から呼ぶこと。
+ */
+function revokeTerminalToken_(terminalCode) {
+  PropertiesService.getScriptProperties().deleteProperty(TOKEN_PROP_PREFIX + terminalCode)
+  invalidateTerminalStatusCache_(terminalCode)
+}
+
+/**
  * シンプルトリガー。`端末` タブが手編集された行の端末コードについて、
  * 状態キャッシュを即時破棄する（design 6.4 の「シートを手編集」経路）。
- * コンテナバインド型のプロジェクトでは `onEdit` という名前の関数を置くだけで
- * 自動的に有効になり、追加のトリガー登録は不要。
+ * 状態列（D列）が `無効` に変更された場合は、トークン実体も破壊的に削除する
+ * （design 6.3）。コンテナバインド型のプロジェクトでは `onEdit` という名前の
+ * 関数を置くだけで自動的に有効になり、追加のトリガー登録は不要。
  *
  * 複数行にまたがる編集（貼り付け等）にも対応する。
+ *
+ * 【重要】スクリプト経由（SpreadsheetApp API）でのセル書き換えは、この
+ * シンプルトリガーを発火させない。カスタムメニューからの無効化操作（Menu.js）
+ * では、この関数を経由せず自前で `revokeTerminalToken_` を呼ぶ必要がある。
  *
  * 【重要】GAS はスクリプト全体で `onEdit` という名前の関数を1つしか実行できない。
  * 将来 `端末` タブ以外の編集にも反応させたくなった場合は、この関数の中に
@@ -218,13 +241,23 @@ function onEdit(e) {
   if (sheet.getName() !== TERMINAL_SHEET_NAME) return
 
   var startRow = e.range.getRow()
+  var startCol = e.range.getColumn()
   var numRows = e.range.getNumRows()
+  var numCols = e.range.getNumColumns()
+  var touchesStatusColumn = startCol <= 4 && startCol + numCols - 1 >= 4 // D列: 状態
 
   for (var offset = 0; offset < numRows; offset++) {
     var row = startRow + offset
     if (row < 2) continue // ヘッダー行は無視
     var terminalCode = sheet.getRange(row, 1).getValue()
-    if (terminalCode) invalidateTerminalStatusCache_(terminalCode)
+    if (!terminalCode) continue
+
+    if (touchesStatusColumn && sheet.getRange(row, 4).getValue() === '無効') {
+      revokeTerminalToken_(terminalCode)
+      logOperation_('(シート編集)', '端末無効化', '端末コード ' + terminalCode, { via: 'onEdit' })
+    } else {
+      invalidateTerminalStatusCache_(terminalCode)
+    }
   }
 }
 
