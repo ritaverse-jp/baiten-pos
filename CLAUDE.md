@@ -13,7 +13,7 @@
 
 ## 現在の状態
 
-`docs/design.md` 7章の実装タスクのうち、**タスク11（フロント GAS 通信層）まで完了**。次はタスク12（状態管理＋伝票永続化）。
+`docs/design.md` 7章の実装タスクのうち、**タスク12（状態管理＋伝票永続化）まで完了**。次はタスク13（SC-01 会計画面）。
 
 GAS はデプロイ済み（コンテナバインド型、Webアプリとして公開）。Webアプリ URL はユーザーが把握しており、`.clasp.json`（gitignore 済み）に紐づく。`registerTerminal` の実装により、`getMasters`・`appendSales`・`getTodayMaxSeq`・`saveProduct`/`deleteProduct`/`saveCategory`/`deleteCategory` を実トークンでの一気通貫フローとして curl で確認済み。カスタムメニュー（`onOpen`／Menu.js）はユーザーが実際にスプレッドシートUIから操作して確認済み。PIN のハッシュ値は Script Properties の `pinHash` にユーザーが直接設定済み（PIN 自体はアシスタントには開示していない運用）。
 
@@ -40,12 +40,16 @@ GAS はデプロイ済み（コンテナバインド型、Webアプリとして�
 - `src/data/sync/counter.ts` — 連番カウンタの get-and-increment。`db.transaction('rw', db.counters, ...)` を自前で開くが、`db.counters` を含む外側のトランザクションから呼ばれた場合はそれに参加する（Dexie のトランザクション伝播）。**タスク15の会計確定処理はこれを利用し、採番と会計データの保存を1つの外側トランザクションにまとめること**（不変条件9）。`reconcileCounterOnStartup` は起動時にカウンタ未初期化を検知したら `getTodayMaxSeq` で復元する（design 5.3）。**呼び出し元（アプリ起動時・会計画面）はまだ配線されていない**（タスク13以降で行う）。オフラインで復元できない場合は `'blocked'` を返すので、呼び出し側はこれを見て会計開始をブロックすること
 - `src/data/gas/client.ts` — GAS への低レベル通信（`postToGas`/`getFromGas`）。text/plain POST・タイムアウト（35秒。GAS 側の `waitLock(30000)` より長く取ること）・エラー正規化を行う。**`fetch()` はデフォルトのリダイレクト追従で問題なく動く**（GAS の 302 リダイレクトは Node の `fetch()` で実機確認済み。curl の `-L` で起きたボディ破損は curl 固有の挙動でブラウザの `fetch()` では発生しない）
 - `src/data/gas/endpoints.ts` — GAS の13エンドポイントに対応する型つきラッパー。**呼び出し側はここだけを使い、`client.ts` を直接呼ばない。** トークン・端末コード・GAS URL は `data/db/config.ts` から読み、未設定なら通信せず `NOT_CONFIGURED` を返す。**`getTodayMaxSeq`/`getSalesHistory` のワイヤーフィールド名は `date`（`dateKey` ではない）。** `domain/types.ts` の命名と GAS 側実装（`gas/Sales.js`）を突き合わせて見つかった不一致を修正済み。**新しいリクエスト/レスポンス型を `domain/types.ts` に追加するときは、必ず対応する GAS 側のコード（`gas/*.js`）のフィールド名と一字一句突き合わせること**（型だけを見て「良さそう」と判断しない）
+- `src/state/ticketStore.ts`（Zustand） — 入力中伝票。**すべての変更操作は `domain/ticket.ts` に委譲し、成功時のみ書き込みのたびに `currentTicket` テーブルへ保存する**（NF-04）。画面はストアのアクション（`addProductByNo` 等）だけを呼び、`lines` 配列を直接書き換えないこと
+- `src/state/masterStore.ts`（Zustand） — 商品・カテゴリのキャッシュ。`replace()` が `data/db/masters.ts` の丸ごと置き換えとストアの更新を同時に行う。1件ずつの更新はここにも生やさないこと
+- `src/state/syncStore.ts`（Zustand） — 接続状態・未送信件数・同期状態。`connection` を書き換えるのは同期エンジン（タスク16）の責務。ここは `SyncState`（`domain/types.ts`）をそのまま状態として使っている
+- `src/app/App.tsx` — 起動時に3ストアの `hydrate()` を呼ぶ配線をここに置いている。画面（タスク13〜）を追加する際も、この起動時フックの位置は変えないこと
 
-テストで IndexedDB を使う場合は `fake-indexeddb/auto`（`src/test/setup.ts` で読み込み済み）が有効なので追加の対応は不要。各アクセサのテストは対象テーブルを `beforeEach` で `clear()` してから実行する（同一 Dexie インスタンスをテスト間で共有しているため）。`data/gas/` のテストは `vi.stubGlobal('fetch', ...)` でモックする。実機確認をしたい場合は一時的な `*.test.ts` を作って `npx vitest run <path>` で個別実行し、確認後に削除すること（自動テストスイートに実ネットワーク依存のテストを含めない）。
+テストで IndexedDB を使う場合は `fake-indexeddb/auto`（`src/test/setup.ts` で読み込み済み）が有効なので追加の対応は不要。各アクセサのテストは対象テーブルを `beforeEach` で `clear()` してから実行する（同一 Dexie インスタンスをテスト間で共有しているため）。Zustand ストアのテストも同様に `beforeEach` で `useXxxStore.setState({...初期値})` してから実行する（ストアはモジュールレベルのシングルトンでテスト間を跨いで状態が残るため）。`data/gas/` のテストは `vi.stubGlobal('fetch', ...)` でモックする。実機確認をしたい場合は一時的な `*.test.ts` を作って `npx vitest run <path>` で個別実行し、確認後に削除すること（自動テストスイートに実ネットワーク依存のテストを含めない）。
 
 `src/` 配下の他のディレクトリは設計 3.1 の構成で用意済みだが、まだ空。
 
-**タスク13以降で必ず対応すること：** `data/sync/counter.ts` の `reconcileCounterOnStartup` は実装済みだが、呼び出し元（アプリ起動時・会計画面表示前）がまだ配線されていない。会計を開始する前に必ずこれを呼び、`'blocked'` が返ったら会計開始をブロックしてその旨を表示すること（設計 5.3）。
+**タスク13以降で必ず対応すること：** `data/sync/counter.ts` の `reconcileCounterOnStartup` は実装済みだが、呼び出し元（会計画面表示前）がまだ配線されていない。会計を開始する前に必ずこれを呼び、`'blocked'` が返ったら会計開始をブロックしてその旨を表示すること（設計 5.3）。
 
 ## 技術スタック（確定・変更不可）
 
