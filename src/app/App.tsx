@@ -1,12 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import CategoriesScreen from '@/screens/categories/CategoriesScreen'
 import CheckoutScreen from '@/screens/checkout/CheckoutScreen'
+import ProductsScreen from '@/screens/products/ProductsScreen'
 import { reconcileCounterOnStartup } from '@/data/sync/counter'
 import { startSyncEngine } from '@/data/sync/engine'
 import { useMasterStore } from '@/state/masterStore'
 import { useSyncStore } from '@/state/syncStore'
 import { useTicketStore } from '@/state/ticketStore'
 
+/** 画面遷移。ルーティングライブラリを使うほどの規模ではないため単純な状態切り替えにする */
+type View = 'checkout' | 'products' | 'categories'
+
 export default function App() {
+  const [view, setView] = useState<View>('checkout')
   const hydrateTicket = useTicketStore((s) => s.hydrate)
   const hydrateMasters = useMasterStore((s) => s.hydrate)
   const hydrateSync = useSyncStore((s) => s.hydrate)
@@ -31,5 +37,11 @@ export default function App() {
     startSyncEngine()
   }, [hydrateTicket, hydrateMasters, hydrateSync])
 
-  return <CheckoutScreen />
+  if (view === 'products') {
+    return <ProductsScreen onBack={() => setView('checkout')} onNavigateToCategories={() => setView('categories')} />
+  }
+  if (view === 'categories') {
+    return <CategoriesScreen onBack={() => setView('products')} />
+  }
+  return <CheckoutScreen onNavigateToProducts={() => setView('products')} />
 }

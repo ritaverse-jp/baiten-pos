@@ -7,13 +7,15 @@
  * （`replaceProducts`/`replaceCategories` の契約をストアでも維持する。
  * CLAUDE.md「1件ずつの追加・更新は提供しない」）。
  *
- * `replace()` の呼び出し元は GAS から `getMasters` を取得した後の処理
- * （タスク16の同期エンジン・タスク19の設定画面）で、まだ配線されていない。
+ * `replace()` は `refreshFromServer()`（タスク17：商品・カテゴリ編集画面が
+ * 自身の保存・削除の直後に呼ぶ）から使う。GAS から `getMasters` を取得し
+ * 直すことで、他端末の変更や「後勝ち」の結果も含めて常に最新化する。
  */
 
 import { create } from 'zustand'
 import { getAllCategories, getAllProducts, replaceCategories, replaceProducts } from '@/data/db/masters'
-import type { Category, Product } from '@/domain/types'
+import { getMasters } from '@/data/gas/endpoints'
+import type { ApiResponse, Category, Product } from '@/domain/types'
 
 interface MasterStoreState {
   products: Product[]
@@ -27,11 +29,13 @@ interface MasterStoreActions {
   hydrate: () => Promise<void>
   /** GAS から取得したマスタで、IndexedDB とストアの両方を丸ごと置き換える */
   replace: (products: readonly Product[], categories: readonly Category[]) => Promise<void>
+  /** `getMasters` を呼び、成功時は `replace()` する。失敗時はストアを変更せずエラーを返す */
+  refreshFromServer: () => Promise<ApiResponse<void>>
 }
 
 export type MasterStore = MasterStoreState & MasterStoreActions
 
-export const useMasterStore = create<MasterStore>((set) => ({
+export const useMasterStore = create<MasterStore>((set, get) => ({
   products: [],
   categories: [],
   hydrated: false,
@@ -44,5 +48,12 @@ export const useMasterStore = create<MasterStore>((set) => ({
   replace: async (products, categories) => {
     await Promise.all([replaceProducts(products), replaceCategories(categories)])
     set({ products: [...products], categories: [...categories] })
+  },
+
+  refreshFromServer: async () => {
+    const result = await getMasters()
+    if (!result.ok) return result
+    await get().replace(result.data.products, result.data.categories)
+    return { ok: true, data: undefined }
   },
 }))

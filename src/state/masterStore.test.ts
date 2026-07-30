@@ -1,8 +1,15 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { saveConfig } from '@/data/db/config'
 import { getAllCategories, getAllProducts } from '@/data/db/masters'
 import { db } from '@/data/db/schema'
-import { toYen, type Category, type Product } from '@/domain/types'
+import { toTerminalCode, toYen, type Category, type Product } from '@/domain/types'
 import { useMasterStore } from './masterStore'
+
+const GAS_URL = 'https://script.google.com/macros/s/FAKE/exec'
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200 })
+}
 
 function product(overrides: Partial<Product> = {}): Product {
   return {
@@ -75,5 +82,42 @@ describe('replace', () => {
     expect(useMasterStore.getState().products).toEqual([])
     expect(useMasterStore.getState().categories).toEqual([])
     expect(await getAllProducts()).toEqual([])
+  })
+})
+
+describe('refreshFromServer', () => {
+  beforeEach(async () => {
+    await db.config.clear()
+    await saveConfig({ gasUrl: GAS_URL, apiToken: 'tok', terminalCode: toTerminalCode('A') })
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('成功時はgetMastersの結果でreplaceする', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({
+        ok: true,
+        data: { products: [product()], categories: [category()], terminalStatus: '有効', fetchedAt: '2026-07-30T00:00:00+09:00' },
+      }),
+    )
+
+    const result = await useMasterStore.getState().refreshFromServer()
+
+    expect(result.ok).toBe(true)
+    expect(useMasterStore.getState().products).toHaveLength(1)
+    expect(await getAllProducts()).toHaveLength(1)
+  })
+
+  test('失敗時はストアを変更せずエラーを返す', async () => {
+    await useMasterStore.getState().replace([product()], [category()])
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ ok: false, error: { code: 'TOKEN_EXPIRED', message: '期限切れ' } }))
+
+    const result = await useMasterStore.getState().refreshFromServer()
+
+    expect(result.ok).toBe(false)
+    expect(useMasterStore.getState().products).toHaveLength(1)
   })
 })
