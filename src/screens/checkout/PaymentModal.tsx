@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { canConfirm, change, isSettleable, shortage, ticketTotal } from '@/domain/calc'
 import { formatYen } from '@/domain/format'
-import { toYen, type TicketLine } from '@/domain/types'
+import { toYen, type TicketLine, type Yen } from '@/domain/types'
 import styles from './CheckoutScreen.module.css'
 
 /** クイックボタンの金額（要件定義 6.8） */
@@ -10,8 +10,8 @@ const QUICK_AMOUNTS = [1000, 5000, 10000] as const
 interface PaymentModalProps {
   lines: TicketLine[]
   onClose: () => void
-  /** 会計確定の実処理（採番・保存・キュー投入）はタスク15で実装する。ここでは確認後に呼ぶだけ */
-  onConfirm: () => void
+  /** 確認ダイアログでOKされた後に、入力済みの預かり金額とともに呼ばれる */
+  onConfirm: (received: Yen) => void
 }
 
 /**
@@ -45,7 +45,7 @@ export default function PaymentModal({ lines, onClose, onConfirm }: PaymentModal
     if (!confirmable) return
     // 要件定義 7.3：「会計確定」は確認ダイアログを挟む
     if (!window.confirm('会計を確定します。よろしいですか？')) return
-    onConfirm()
+    onConfirm(receivedYen)
   }
 
   return (

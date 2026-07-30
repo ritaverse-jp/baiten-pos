@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
+import { confirmSale, CONFIRM_SALE_ERROR_MESSAGES } from '@/data/sync/checkout'
 import { ticketErrorMessage } from '@/domain/ticket'
+import type { Yen } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
+import { useSyncStore } from '@/state/syncStore'
 import { useTicketStore } from '@/state/ticketStore'
 import CategoryTabs from './CategoryTabs'
 import Numpad from './Numpad'
@@ -15,13 +18,15 @@ const HIGHLIGHT_DURATION_MS = 600
 /**
  * SC-01 会計画面。要件定義 7.2 のレイアウト・FR-03〜08 の操作を実装する。
  *
- * 精算モーダル（SC-02・FR-09/10）はタスク14で実装済み。会計確定の実処理
- * （採番・ローカル保存・キュー投入・伝票クリア。FR-11）はタスク15の担当で、
- * `PaymentModal` の `onConfirm` は今はまだ何もしないスタブになっている。
+ * 精算モーダル（SC-02・FR-09/10）はタスク14で実装済み。会計確定
+ * （採番・ローカル保存・キュー投入・伝票クリア。FR-11）は `data/sync/checkout.ts`
+ * の `confirmSale` に委譲する（design 4.1・不変条件9）。同期エンジンの起動
+ * （確定後に非同期でキューを送信する。design 4.1 手順4）はタスク16の担当。
  */
 export default function CheckoutScreen() {
   const ticketHydrated = useTicketStore((s) => s.hydrated)
   const lines = useTicketStore((s) => s.lines)
+  const note = useTicketStore((s) => s.note)
   const addProductByNo = useTicketStore((s) => s.addProductByNo)
 
   const masterHydrated = useMasterStore((s) => s.hydrated)
@@ -72,6 +77,25 @@ export default function CheckoutScreen() {
   const handleNumpadSubmit = () => {
     if (!numpadValue) return
     void handleAddProduct(Number(numpadValue)).then(() => setNumpadValue(''))
+  }
+
+  /**
+   * 会計確定（FR-11）。ステップ3「UI は即座に次の会計へ」（design 4.1）を
+   * 満たすため、確定後は即座にモーダルを閉じて伝票をクリアする。
+   * 同期エンジン（タスク16）の起動はここに追加する。
+   */
+  const handleConfirmSale = async (received: Yen) => {
+    const result = await confirmSale(lines, note, received, new Date())
+    if (!result.ok) {
+      window.alert(CONFIRM_SALE_ERROR_MESSAGES[result.error])
+      return
+    }
+
+    setPaymentModalOpen(false)
+    // confirmSale が同一トランザクションで currentTicket を既に削除している。
+    // ここでは画面（Zustand の in-memory 状態）側を空に戻すだけでよい
+    await useTicketStore.getState().clear()
+    await useSyncStore.getState().refreshPendingCount()
   }
 
   const visibleProducts = products.filter((p) => p.categoryName === selectedCategory)
@@ -127,10 +151,7 @@ export default function CheckoutScreen() {
         <PaymentModal
           lines={lines}
           onClose={() => setPaymentModalOpen(false)}
-          onConfirm={() => {
-            // FR-11 の実処理（採番・保存・キュー投入・伝票クリア）はタスク15で実装する
-            setPaymentModalOpen(false)
-          }}
+          onConfirm={(received) => void handleConfirmSale(received)}
         />
       )}
     </main>

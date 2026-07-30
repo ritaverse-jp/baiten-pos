@@ -1,9 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { saveConfig } from '@/data/db/config'
+import { getAllPendingSales } from '@/data/db/pendingQueue'
+import { getAllSales } from '@/data/db/sales'
 import { db } from '@/data/db/schema'
-import { toYen, type Category, type Product } from '@/domain/types'
+import { toTerminalCode, toYen, type Category, type Product } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
+import { useSyncStore } from '@/state/syncStore'
 import { useTicketStore } from '@/state/ticketStore'
 import CheckoutScreen from './CheckoutScreen'
 
@@ -49,8 +53,13 @@ beforeEach(async () => {
   await db.currentTicket.clear()
   await db.products.clear()
   await db.categories.clear()
+  await db.config.clear()
+  await db.counters.clear()
+  await db.sales.clear()
+  await db.pendingQueue.clear()
   useTicketStore.setState({ lines: [], note: '', hydrated: false })
   useMasterStore.setState({ products: [], categories: [], hydrated: false })
+  useSyncStore.setState({ connection: 'unknown', pendingCount: 0, syncing: false, lastSyncedAt: null, blockedBy: null })
 })
 
 afterEach(() => {
@@ -414,5 +423,70 @@ describe('商品追加時のフィードバック（要件定義7.3）', () => {
     render(<CheckoutScreen />)
 
     await expect(user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))).resolves.not.toThrow()
+  })
+})
+
+describe('会計確定フロー（FR-11・design 4.1・不変条件9）', () => {
+  test('商品追加→精算→確定の一連の操作で、キューに積まれ伝票がクリアされる', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await saveConfig({ terminalCode: toTerminalCode('A') })
+    seedMasters([KARAAGE], [FOOD])
+    render(<CheckoutScreen />)
+
+    // FR-04：商品タップで追加
+    await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
+    await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
+
+    // 精算へ
+    await user.click(screen.getByRole('button', { name: '精算へ' }))
+    expect(screen.getByRole('dialog', { name: '精算' })).toBeInTheDocument()
+
+    // ちょうどの金額で会計確定
+    await user.click(screen.getByRole('button', { name: 'ちょうど' }))
+    await user.click(screen.getByRole('button', { name: '会計確定' }))
+
+    // design 4.1 手順3：UIは即座に次の会計へ（モーダルが閉じ、伝票が空になる）
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '精算' })).not.toBeInTheDocument()
+    })
+    expect(useTicketStore.getState().lines).toEqual([])
+    expect(screen.getByText('商品が追加されていません')).toBeInTheDocument()
+
+    // ローカル保存（sales）と未送信キュー（pendingQueue）の両方に積まれている
+    const sales = await getAllSales()
+    expect(sales).toHaveLength(1)
+    expect(sales[0].total).toBe(500)
+    expect(sales[0].synced).toBe(false)
+
+    const pending = await getAllPendingSales()
+    expect(pending).toHaveLength(1)
+    expect(pending[0].saleId).toBe(sales[0].saleId)
+
+    // 画面上部の未送信件数バッジ用の状態も更新されている
+    await waitFor(() => expect(useSyncStore.getState().pendingCount).toBe(1))
+  })
+
+  test('端末未登録の場合はエラーを表示し、キューには積まない（saleIdの生成に端末コードが必須なため）', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    // config.terminalCode を設定しない
+    seedMasters([KARAAGE], [FOOD])
+    render(<CheckoutScreen />)
+
+    await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
+    await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
+    await user.click(screen.getByRole('button', { name: '精算へ' }))
+    await user.click(screen.getByRole('button', { name: 'ちょうど' }))
+
+    await user.click(screen.getByRole('button', { name: '会計確定' }))
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('端末はまだ登録されていません'))
+    // 伝票もキューも変更されていない（失敗時は何も起こらない）
+    expect(useTicketStore.getState().lines).toHaveLength(1)
+    expect(await getAllPendingSales()).toEqual([])
+    // モーダルは開いたままで、預かり金の再入力からやり直せる
+    expect(screen.getByRole('dialog', { name: '精算' })).toBeInTheDocument()
   })
 })

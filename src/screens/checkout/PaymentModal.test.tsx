@@ -151,7 +151,7 @@ describe('会計確定（要件定義7.3の確認ダイアログ）', () => {
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
-  test('確認ダイアログでOKすると onConfirm が呼ばれる', async () => {
+  test('確認ダイアログでOKすると、入力済みの預かり金額とともに onConfirm が呼ばれる', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { onConfirm } = renderModal({ total: 1200 })
@@ -161,6 +161,7 @@ describe('会計確定（要件定義7.3の確認ダイアログ）', () => {
 
     expect(window.confirm).toHaveBeenCalled()
     expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onConfirm).toHaveBeenCalledWith(1200)
   })
 
   test('確認ダイアログでキャンセルすると onConfirm は呼ばれない', async () => {
