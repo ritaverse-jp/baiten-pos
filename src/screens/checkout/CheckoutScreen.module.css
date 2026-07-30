@@ -315,3 +315,124 @@
 .ticketActions button {
   flex: 1;
 }
+
+/*
+ * SC-02 精算モーダル（要件定義 FR-09・FR-10・6.7・6.8）。
+ */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 10;
+}
+
+.modal {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1rem;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modalTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+.modalTotalAmount {
+  font-size: 1.5rem; /* 要件定義 7.3：金額表示は最低24pt */
+  font-variant-numeric: tabular-nums;
+}
+
+.changeDisplay,
+.shortageDisplay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+.changeDisplay {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.shortageDisplay {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.changeLabel {
+  font-size: 1rem;
+}
+
+.changeAmount {
+  font-size: 2.5rem; /* 要件定義 7.3：合計・釣銭は40pt以上 */
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.receivedDisplay {
+  text-align: center;
+  font-size: 1.5rem; /* 要件定義 7.3：金額表示は最低24pt */
+  font-variant-numeric: tabular-nums;
+  color: #374151;
+}
+
+.quickAmounts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.paymentKeypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.paymentKeypad button {
+  font-size: 1.25rem;
+}
+
+.paymentKeypadClear {
+  grid-column: span 2;
+}
+
+.confirmButton {
+  background: #1f2937;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 1.25rem;
+}
+
+.confirmButton:disabled {
+  background: #9ca3af;
+}

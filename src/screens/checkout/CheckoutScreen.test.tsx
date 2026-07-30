@@ -354,7 +354,7 @@ describe('精算へボタン', () => {
     expect(screen.getByRole('button', { name: '精算へ' })).toBeDisabled()
   })
 
-  test('商品を追加すると活性になる（モーダル自体はタスク14で実装）', async () => {
+  test('商品を追加すると活性になる', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
     render(<CheckoutScreen />)
@@ -364,6 +364,32 @@ describe('精算へボタン', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '精算へ' })).toBeEnabled()
     })
+  })
+
+  test('タップすると精算モーダル（SC-02）が開く', async () => {
+    const user = userEvent.setup()
+    seedMasters([KARAAGE], [FOOD])
+    render(<CheckoutScreen />)
+    await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '精算へ' })).toBeEnabled())
+
+    await user.click(screen.getByRole('button', { name: '精算へ' }))
+
+    expect(screen.getByRole('dialog', { name: '精算' })).toBeInTheDocument()
+    expect(screen.getByTestId('modal-total')).toHaveTextContent('500円')
+  })
+
+  test('精算モーダルを閉じると会計画面に戻る', async () => {
+    const user = userEvent.setup()
+    seedMasters([KARAAGE], [FOOD])
+    render(<CheckoutScreen />)
+    await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '精算へ' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '精算へ' }))
+
+    await user.click(screen.getByRole('button', { name: '精算を閉じる' }))
+
+    expect(screen.queryByRole('dialog', { name: '精算' })).not.toBeInTheDocument()
   })
 })
 

@@ -4,6 +4,7 @@ import { useMasterStore } from '@/state/masterStore'
 import { useTicketStore } from '@/state/ticketStore'
 import CategoryTabs from './CategoryTabs'
 import Numpad from './Numpad'
+import PaymentModal from './PaymentModal'
 import ProductGrid from './ProductGrid'
 import TicketPanel from './TicketPanel'
 import styles from './CheckoutScreen.module.css'
@@ -14,8 +15,9 @@ const HIGHLIGHT_DURATION_MS = 600
 /**
  * SC-01 会計画面。要件定義 7.2 のレイアウト・FR-03〜08 の操作を実装する。
  *
- * 精算（FR-09〜11・SC-02）はタスク14の担当。「精算へ」ボタンはここでは
- * 活性制御のみ行い、実際にモーダルを開く処理はまだ持たない。
+ * 精算モーダル（SC-02・FR-09/10）はタスク14で実装済み。会計確定の実処理
+ * （採番・ローカル保存・キュー投入・伝票クリア。FR-11）はタスク15の担当で、
+ * `PaymentModal` の `onConfirm` は今はまだ何もしないスタブになっている。
  */
 export default function CheckoutScreen() {
   const ticketHydrated = useTicketStore((s) => s.hydrated)
@@ -30,6 +32,7 @@ export default function CheckoutScreen() {
   const [numpadValue, setNumpadValue] = useState('')
   const [numpadError, setNumpadError] = useState<string | null>(null)
   const [highlightedLineId, setHighlightedLineId] = useState<string | null>(null)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
 
   // カテゴリが読み込まれたら、表示順が最初のものを既定選択にする
   useEffect(() => {
@@ -111,9 +114,24 @@ export default function CheckoutScreen() {
           </div>
 
           <div className={styles.ticketArea}>
-            <TicketPanel lines={lines} highlightedLineId={highlightedLineId} onGoToPayment={() => {}} />
+            <TicketPanel
+              lines={lines}
+              highlightedLineId={highlightedLineId}
+              onGoToPayment={() => setPaymentModalOpen(true)}
+            />
           </div>
         </>
+      )}
+
+      {paymentModalOpen && (
+        <PaymentModal
+          lines={lines}
+          onClose={() => setPaymentModalOpen(false)}
+          onConfirm={() => {
+            // FR-11 の実処理（採番・保存・キュー投入・伝票クリア）はタスク15で実装する
+            setPaymentModalOpen(false)
+          }}
+        />
       )}
     </main>
   )

@@ -13,7 +13,7 @@
 
 ## 現在の状態
 
-`docs/design.md` 7章の実装タスクのうち、**タスク13（SC-01 会計画面）まで完了**。次はタスク14（SC-02 精算モーダル）。
+`docs/design.md` 7章の実装タスクのうち、**タスク14（SC-02 精算モーダル）まで完了**。次はタスク15（会計確定フロー）。
 
 GAS はデプロイ済み（コンテナバインド型、Webアプリとして公開）。Webアプリ URL はユーザーが把握しており、`.clasp.json`（gitignore 済み）に紐づく。`registerTerminal` の実装により、`getMasters`・`appendSales`・`getTodayMaxSeq`・`saveProduct`/`deleteProduct`/`saveCategory`/`deleteCategory` を実トークンでの一気通貫フローとして curl で確認済み。カスタムメニュー（`onOpen`／Menu.js）はユーザーが実際にスプレッドシートUIから操作して確認済み。PIN のハッシュ値は Script Properties の `pinHash` にユーザーが直接設定済み（PIN 自体はアシスタントには開示していない運用）。
 
@@ -46,7 +46,8 @@ GAS はデプロイ済み（コンテナバインド型、Webアプリとして�
 - `src/domain/format.ts` — 商品 No. の丸数字表示・金額の3桁区切り表示。React に依存しない純粋関数（要件定義 6.2・7.2）
 - `src/domain/ticket.ts` の `ticketErrorMessage()` — `TicketError`（`TicketError` 固有＋`CalcError`）から日本語メッセージを引く統合関数。画面はこれだけ呼べばよく、エラーの出自（ticket.ts か calc.ts か）を気にしなくてよい
 - `src/app/App.tsx` — 起動時に3ストアの `hydrate()` を呼ぶ配線をここに置いている。`CheckoutScreen`（`screens/checkout/`）を描画する。画面を追加する際も、この起動時フックの位置は変えないこと
-- `src/screens/checkout/` — SC-01 会計画面。`CheckoutScreen.tsx` が親で、`CategoryTabs`・`ProductGrid`・`Numpad`・`TicketPanel`・`TicketLineRow` に分割している。スタイルは `CheckoutScreen.module.css`（CSS Modules）に集約し、他コンポーネントもここから import する。**hydration ガードはヘッダーの外側にだけかける**（`ticketHydrated && masterHydrated` が false の間は本文だけ「読み込み中」にし、ヘッダーは常に表示する。空の伝票が一瞬見えてから中身が現れる「ちらつき」を防ぐ設計。詳細はタスク13の完了報告を参照）。確認ダイアログ（伝票クリア・削除）は `window.confirm` を使う（専用ダイアログコンポーネントはまだ無いため）。「精算へ」ボタンは活性制御のみでモーダルは未実装（タスク14）
+- `src/screens/checkout/` — SC-01 会計画面 ＋ SC-02 精算モーダル。`CheckoutScreen.tsx` が親で、`CategoryTabs`・`ProductGrid`・`Numpad`・`TicketPanel`・`TicketLineRow`・`PaymentModal` に分割している。スタイルは `CheckoutScreen.module.css`（CSS Modules）に集約し、他コンポーネントもここから import する。**hydration ガードはヘッダーの外側にだけかける**（`ticketHydrated && masterHydrated` が false の間は本文だけ「読み込み中」にし、ヘッダーは常に表示する。空の伝票が一瞬見えてから中身が現れる「ちらつき」を防ぐ設計。詳細はタスク13の完了報告を参照）。確認ダイアログ（伝票クリア・削除・会計確定）は `window.confirm` を使う（専用ダイアログコンポーネントはまだ無いため）。会計確定の実処理（採番・保存・キュー投入・伝票クリア。FR-11）は `PaymentModal` の `onConfirm` プロップからタスク15で配線する
+- `PaymentModal` は `total` を props で受け取らない。**合計金額は必ず `ticketTotal(lines)` から計算すること。** `total` を別 prop として渡す設計にしたところ、`canConfirm()` が内部で `lines` から独自に合計を再計算するため、渡した `total` と実際の `lines` の中身が食い違うとテストが誤って通ってしまう事故が実際に起きた（タスク14）。合計が絡む値は常に `lines` 1箇所から導出し、並行して別経路で渡さないこと
 
 CSS Modules を使うコンポーネントをテストするとき、クラス名はハッシュ化される（`_ticketTotalAmount_xxxxx`）ため、`{ selector: '.className' }` のような生のクラス名指定では要素を見つけられない。**曖昧になりうる要素（同じテキストが複数箇所に出る等）は `data-testid` を振るか `within()` でスコープを絞ること。** 商品ボタン等インタラクティブ要素には明示的な `aria-label` を付け、`getByRole('button', { name: ... })` が正規表現で複数ヒットしないようにする（同じ商品名を含むボタンが1行に複数存在しうるため）。
 
