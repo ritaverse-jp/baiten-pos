@@ -426,7 +426,8 @@ export interface AppendSalesResponse {
 // --- 連番の復元（docs/design.md 2.5 / 5.3） ---
 
 export interface GetTodayMaxSeqRequest extends AuthedRequest {
-  dateKey: DateKey
+  /** ワイヤー上のフィールド名は `date`（gas/Sales.js の実装・design 2.5 に合わせる） */
+  date: DateKey
 }
 
 export interface GetTodayMaxSeqResponse {
@@ -459,10 +460,28 @@ export interface DeleteCategoryRequest extends AuthedRequest {
   name: string
 }
 
+/** 応答は gas/Products.js・Categories.js の実装に合わせる（値をそのまま返すだけ） */
+export interface SaveProductResponse {
+  product: Product
+}
+
+export interface DeleteProductResponse {
+  no: number
+}
+
+export interface SaveCategoryResponse {
+  category: Category
+}
+
+export interface DeleteCategoryResponse {
+  name: string
+}
+
 // --- 履歴・取消（docs/design.md 2.7 / FR-14・FR-15） ---
 
 export interface GetSalesHistoryRequest extends AuthedRequest {
-  dateKey: DateKey
+  /** `GetTodayMaxSeqRequest` と同じ命名規則に揃える（タスク18で GAS 側を実装する際も `date` を使うこと） */
+  date: DateKey
 }
 
 export interface GetSalesHistoryResponse {

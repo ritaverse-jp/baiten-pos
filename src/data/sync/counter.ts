@@ -13,9 +13,15 @@
  * データの保存は同一の Dexie トランザクション内で行う」を満たすには、
  * 呼び出し側（タスク15の会計確定処理）が `db.counters` を含む外側の
  * トランザクションの中で `nextSeq` を呼べばよく、ここに特別な対応は要らない。
+ *
+ * `reconcileCounterOnStartup` は起動時に GAS 通信層（タスク11）を使ってカウンタを
+ * 補正する（docs/design.md 5.3）。
  */
 
+import { getConfig } from '@/data/db/config'
+import { getTodayMaxSeq } from '@/data/gas/endpoints'
 import { db } from '@/data/db/schema'
+import { toDateKey } from '@/domain/saleNumber'
 import type { DateKey } from '@/domain/types'
 
 /**
@@ -35,10 +41,9 @@ export async function nextSeq(dateKey: DateKey): Promise<number> {
 /**
  * 現在のカウンタ値を、払い出しを行わずに読む。存在しなければ 0。
  *
- * 起動時に「当日分のカウンタが存在するか」を確認する用途を想定する
- * （docs/design.md 5.3 の IndexedDB 消失リスクへの対処の一部。実際にサーバーへ
- * `getTodayMaxSeq` を問い合わせてカウンタを補正する起動時フローは、GAS 通信層が
- * 揃うタスク16以降で実装する。ここでは Dexie 側の primitive のみを提供する）。
+ * 起動時に「当日分のカウンタが存在するか」を確認する用途に使う
+ * （docs/design.md 5.3 の IndexedDB 消失リスクへの対処。呼び出し元は
+ * `reconcileCounterOnStartup`）。
  */
 export async function peekSeq(dateKey: DateKey): Promise<number> {
   const current = await db.counters.get(dateKey)
@@ -50,8 +55,8 @@ export async function peekSeq(dateKey: DateKey): Promise<number> {
  * （採番済みの番号を巻き戻さない）。
  *
  * IndexedDB が消去された端末で、シート上の当日最大連番（`getTodayMaxSeq` の
- * 応答）からカウンタを復元する際に使う（docs/design.md 5.3）。呼び出し元
- * （起動時の整合性チェック）はタスク16以降で実装する。
+ * 応答）からカウンタを復元する際に使う（docs/design.md 5.3）。呼び出し元は
+ * `reconcileCounterOnStartup`。
  */
 export async function ensureMinSeq(dateKey: DateKey, minSeq: number): Promise<void> {
   await db.transaction('rw', db.counters, async () => {
@@ -60,4 +65,39 @@ export async function ensureMinSeq(dateKey: DateKey, minSeq: number): Promise<vo
       await db.counters.put({ dateKey, lastSeq: minSeq })
     }
   })
+}
+
+/**
+ * `ok`：復元不要、または復元できた（会計を開始してよい）。
+ * `blocked`：端末データを消した直後に圏外で営業を始めたなど、当日カウンタが
+ * 未初期化なのにサーバーへ問い合わせもできない状態（docs/design.md 5.3
+ * 「オフラインで復元できない場合は会計開始をブロックし、その旨を表示する」）。
+ */
+export type ReconcileCounterResult = 'ok' | 'blocked'
+
+/**
+ * 起動時に呼ぶ。端末登録済みなのに当日のカウンタが未初期化（IndexedDB 消去等）
+ * の場合、`getTodayMaxSeq` でシート上の当日最大連番を取得し、カウンタを
+ * そこまで引き上げて復元する（docs/design.md 5.3）。
+ *
+ * カウンタが既に初期化済みなら何もしない（サーバーに問い合わせない）。
+ * 端末が未登録の場合もここでは何もしない（登録前は会計自体が開始できず、
+ * この関数が守るべき不変条件がそもそも成立しないため）。
+ *
+ * 呼び出し側（会計画面。タスク13以降）は `blocked` を見て会計開始をブロックし、
+ * その旨を表示すること。
+ */
+export async function reconcileCounterOnStartup(now: Date): Promise<ReconcileCounterResult> {
+  const config = await getConfig()
+  if (!config.terminalCode) return 'ok'
+
+  const dateKey = toDateKey(now)
+  const current = await peekSeq(dateKey)
+  if (current > 0) return 'ok'
+
+  const response = await getTodayMaxSeq(dateKey)
+  if (!response.ok) return 'blocked'
+
+  await ensureMinSeq(dateKey, response.data.maxSeq)
+  return 'ok'
 }
