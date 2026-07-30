@@ -13,13 +13,19 @@
 
 ## 現在の状態
 
-`docs/design.md` 7章の実装タスクのうち、**タスク15（会計確定フロー）まで完了**。次はタスク16（同期エンジン）。
+`docs/design.md` 7章の実装タスクのうち、**タスク16（同期エンジン）まで完了**。次はタスク17（SC-03/04 マスタ管理）。
+
+**タスク16はユーザーが実ブラウザ・実デプロイ済みGASで動作確認済み。** これがこのプロジェクトで初めて「実ブラウザ→実GAS」の通信を検証した回（タスク7〜10はcurl、タスク11はNode、タスク13〜15はネットワーク通信を伴わない検証だった）。`registerTerminal` をブラウザのconsoleから直接fetchして実際のapiTokenを取得・configに設定 → Offline化 → 会計確定 → Online復帰 → `pendingQueue`が空になり実際のスプレッドシートに行が追加されることを確認した。副次的に、検証中に何度もオフライン/オンラインを切り替えたにもかかわらずシートの行数が一貫して増えなかったことから、「再送しても行が増えない」も実地で確認できた。
 
 **タスク15はユーザーが実ブラウザ（Chrome DevTools の Network タブを Offline に設定＝機内モード相当）で動作確認済み。** 商品追加→精算→会計確定の操作後、`sales`・`pendingQueue` の両テーブルに一致する `saleId` で記録され、`currentTicket` が空になることを IndexedDB ビュー（Application タブ）で直接確認した。タスク19（設定画面・端末登録）がまだ無いため、確認時は `config.terminalCode` をコンソールから直接 IndexedDB に書き込んで仮設定した（`registerTerminal` を経由しない仮の値。本番の端末登録フローとは別）。
 
 GAS はデプロイ済み（コンテナバインド型、Webアプリとして公開）。Webアプリ URL はユーザーが把握しており、`.clasp.json`（gitignore 済み）に紐づく。`registerTerminal` の実装により、`getMasters`・`appendSales`・`getTodayMaxSeq`・`saveProduct`/`deleteProduct`/`saveCategory`/`deleteCategory` を実トークンでの一気通貫フローとして curl で確認済み。カスタムメニュー（`onOpen`／Menu.js）はユーザーが実際にスプレッドシートUIから操作して確認済み。PIN のハッシュ値は Script Properties の `pinHash` にユーザーが直接設定済み（PIN 自体はアシスタントには開示していない運用）。
 
-**フロント側の実ブラウザ検証で使える手法（タスク19が無い間、今後のタスクでも使う）：** 設定画面（端末登録・マスタ取得）が無いため、`npm run dev` で開いたブラウザの開発者ツールコンソールから、生の `indexedDB.open('baiten-pos')` API で直接テーブルに仮データ（`products`・`categories`・`config` 等）を書き込むと、UI を実際に動かして確認できる。書き込み後は**ページのリロードが必須**（3ストアの `hydrate()` は起動時に一度しか走らないため）。オフライン状態の検証は実機の機内モードより、DevTools の Network タブを「Offline」にする方が手軽で確実。
+**フロント側の実ブラウザ検証で使える手法（タスク19が無い間、今後のタスクでも使う）：**
+- 設定画面（端末登録・マスタ取得）が無いため、`npm run dev` で開いたブラウザの開発者ツールコンソールから、生の `indexedDB.open('baiten-pos')` API で直接テーブルに仮データ（`products`・`categories`・`config` 等）を書き込むと、UI を実際に動かして確認できる。書き込み後は**ページのリロードが必須**（各ストアの `hydrate()` は起動時に一度しか走らないため）
+- オフライン状態の検証は実機の機内モードより、DevTools の Network タブを「Offline」にする方が手軽で確実
+- **実際のGASと通信する検証（同期エンジン等）では、`config.terminalCode` を仮の値で済ませられない。** `apiToken` はGAS側でハッシュ照合されるため、コンソールから `fetch(gasUrl, {method:'POST', ...})` で本物の `registerTerminal` を直接呼び、返ってきた本物の `apiToken` を `config` に書き込む必要がある（PIN はユーザー側で入力し、アシスタントには開示しない運用を継続）
+- **DevTools の IndexedDB パネルは、ページのリロードをまたいでも表示が古いまま更新されないことがある**（更新ボタン・ページリロードでも直らない場合がある）。「Data may be stale」という警告が出続けて実データと食い違って見えるときは、**DevTools 自体を閉じて開き直す**と直ることがある。同期エンジンの検証中、この表示の古さを実際のバグと誤認しかけたことがあるため、キューが「消えない」ように見えたら、まずこれを疑うこと
 
 **タスク9・10の検証で判明した重要な注意点（今後のタスクにも影響する）：**
 - **`CacheService` の60秒TTLのような短い時間窓を、チャットでのユーザーとのやり取り（往復）を挟んで検証しようとすると、往復自体の実時間が60秒に匹敵し、正確なタイミング検証が実務上困難。** タイミング依存の検証は、ユーザーの手操作を1回のスクリプト実行に閉じ込め（例：「キャッシュ書き込み」と「実値の書き換え」を同一関数内で連続実行する）、以降の観測はこちらだけで完結する（ポーリング等）設計にすること。可能なら、まず自分専用の診断用エンドポイント（例：キャッシュの中身を直接読むだけの一時アクション）を先に用意し、状態を都度確認できるようにしてから本題の検証に入るとよい
@@ -41,8 +47,9 @@ GAS はデプロイ済み（コンテナバインド型、Webアプリとして�
 - `src/data/db/masters.ts` — 商品・カテゴリキャッシュ。**1件ずつの追加・更新は提供しない。** 常に `replaceProducts`/`replaceCategories` による丸ごと置き換え（GAS からの再取得結果を反映する形のみ。編集自体はオンライン時に GAS 経由で行う）
 - `src/data/db/currentTicket.ts` — 入力中伝票の永続化。DB 固有の主キー（`id: 'current'`）はこの層の外に漏らさない。呼び出し側は `Ticket` 型だけを扱う
 - `src/data/db/pendingQueue.ts` — 未送信キュー。**`removePendingSale` は GAS の受理応答を受け取った後にのみ呼ぶこと**（不変条件17）。`getAllPendingSales` は enqueuedAt 昇順で返す
-- `src/data/sync/counter.ts` — 連番カウンタの get-and-increment。`db.transaction('rw', db.counters, ...)` を自前で開くが、`db.counters` を含む外側のトランザクションから呼ばれた場合はそれに参加する（Dexie のトランザクション伝播）。`data/sync/checkout.ts` の `confirmSale` がこれを利用し、採番と会計データの保存を1つの外側トランザクションにまとめている（不変条件9）。`reconcileCounterOnStartup` は起動時にカウンタ未初期化を検知したら `getTodayMaxSeq` で復元する（design 5.3）。**呼び出し元（`app/App.tsx` の起動時 `hydrate()` 群と同じ場所が自然）はまだ配線されていない。** オフラインで復元できない場合は `'blocked'` を返すので、呼び出し側はこれを見て会計開始をブロックすること
-- `src/data/sync/checkout.ts` — 会計確定（FR-11）。`confirmSale(lines, note, received, now)` が採番・`sales`保存・`pendingQueue`投入・`currentTicket`削除を**単一のDexieトランザクション**で行う（design 4.1・不変条件9）。`端末未登録`（`config.terminalCode` が無い）の場合のみ拒否する（`canConfirm` による預かり金・空伝票のチェックは呼び出し側の責務で、ここでは再検証しない）。**同期エンジンの起動（design 4.1 手順4：確定後に非同期でキューを送信する）はまだ無い**（タスク16）。呼び出し後、画面側は `ticketStore.clear()`（in-memory状態のリセット。DBの`currentTicket`は`confirmSale`が既に削除済みなので二重削除だが無害）と `syncStore.refreshPendingCount()` を呼ぶこと
+- `src/data/sync/counter.ts` — 連番カウンタの get-and-increment。`db.transaction('rw', db.counters, ...)` を自前で開くが、`db.counters` を含む外側のトランザクションから呼ばれた場合はそれに参加する（Dexie のトランザクション伝播）。`data/sync/checkout.ts` の `confirmSale` がこれを利用し、採番と会計データの保存を1つの外側トランザクションにまとめている（不変条件9）。`reconcileCounterOnStartup` は起動時にカウンタ未初期化を検知したら `getTodayMaxSeq` で復元する（design 5.3）。**`app/App.tsx` の起動時 `hydrate()` 群と同じ `useEffect` から呼ぶよう配線済み**（タスク16）。オフラインで復元できない場合は `'blocked'` を返すが、**この結果を見て会計開始を実際にブロックする画面側の対応はまだ無い**（起動時のベストエフォート補正のみ）
+- `src/data/sync/checkout.ts` — 会計確定（FR-11）。`confirmSale(lines, note, received, now)` が採番・`sales`保存・`pendingQueue`投入・`currentTicket`削除を**単一のDexieトランザクション**で行う（design 4.1・不変条件9）。`端末未登録`（`config.terminalCode` が無い）の場合のみ拒否する（`canConfirm` による預かり金・空伝票のチェックは呼び出し側の責務で、ここでは再検証しない）。`CheckoutScreen.handleConfirmSale` が確定成功後に `data/sync/engine.ts` の `runSync()` を fire-and-forget で呼ぶ（design 4.1 手順4「会計確定時」トリガー）
+- `src/data/sync/engine.ts` — 同期エンジン（design 4.1・6.6）。`runSync(options?)` が1回分の送信を担当し、`startSyncEngine()` が `app/App.tsx` の起動時に一度だけ呼ばれ online イベント・visibilitychange・30秒間隔を配線する。**多重起動ガード（モジュールスコープの `syncing` フラグ）は、ガード判定とフラグを立てる処理の間に `await` を挟むと競合する。** 実装時に実際にこの競合でテストが落ちた（2つの `runSync()` を同時に呼ぶと2回送信されてしまっていた）。ガード関連のコードを触るときは、`if (syncing) return` から `syncing = true` までを**同期的に**（`await` を挟まずに）行うこと。`blockedBy`（`TOKEN_EXPIRED`/`TERMINAL_DISABLED`）が立っている間、`force: true` を指定しない限り自動トリガーは何もしない。`force: true` は将来の設定画面の手動再送信ボタン用に用意してあるが、**そのボタン自体・design 6.5 の残り14日プロアクティブ更新・`TERMINAL_DISABLED` 端末のCSVエクスポートはまだ実装していない**（タスク19）
 - `src/data/gas/client.ts` — GAS への低レベル通信（`postToGas`/`getFromGas`）。text/plain POST・タイムアウト（35秒。GAS 側の `waitLock(30000)` より長く取ること）・エラー正規化を行う。**`fetch()` はデフォルトのリダイレクト追従で問題なく動く**（GAS の 302 リダイレクトは Node の `fetch()` で実機確認済み。curl の `-L` で起きたボディ破損は curl 固有の挙動でブラウザの `fetch()` では発生しない）
 - `src/data/gas/endpoints.ts` — GAS の13エンドポイントに対応する型つきラッパー。**呼び出し側はここだけを使い、`client.ts` を直接呼ばない。** トークン・端末コード・GAS URL は `data/db/config.ts` から読み、未設定なら通信せず `NOT_CONFIGURED` を返す。**`getTodayMaxSeq`/`getSalesHistory` のワイヤーフィールド名は `date`（`dateKey` ではない）。** `domain/types.ts` の命名と GAS 側実装（`gas/Sales.js`）を突き合わせて見つかった不一致を修正済み。**新しいリクエスト/レスポンス型を `domain/types.ts` に追加するときは、必ず対応する GAS 側のコード（`gas/*.js`）のフィールド名と一字一句突き合わせること**（型だけを見て「良さそう」と判断しない）
 - `src/state/ticketStore.ts`（Zustand） — 入力中伝票。**すべての変更操作は `domain/ticket.ts` に委譲し、成功時のみ書き込みのたびに `currentTicket` テーブルへ保存する**（NF-04）。画面はストアのアクション（`addProductByNo` 等）だけを呼び、`lines` 配列を直接書き換えないこと
@@ -50,7 +57,7 @@ GAS はデプロイ済み（コンテナバインド型、Webアプリとして�
 - `src/state/syncStore.ts`（Zustand） — 接続状態・未送信件数・同期状態。`connection` を書き換えるのは同期エンジン（タスク16）の責務。ここは `SyncState`（`domain/types.ts`）をそのまま状態として使っている
 - `src/domain/format.ts` — 商品 No. の丸数字表示・金額の3桁区切り表示。React に依存しない純粋関数（要件定義 6.2・7.2）
 - `src/domain/ticket.ts` の `ticketErrorMessage()` — `TicketError`（`TicketError` 固有＋`CalcError`）から日本語メッセージを引く統合関数。画面はこれだけ呼べばよく、エラーの出自（ticket.ts か calc.ts か）を気にしなくてよい
-- `src/app/App.tsx` — 起動時に3ストアの `hydrate()` を呼ぶ配線をここに置いている。`CheckoutScreen`（`screens/checkout/`）を描画する。画面を追加する際も、この起動時フックの位置は変えないこと
+- `src/app/App.tsx` — 起動時に3ストアの `hydrate()`・`reconcileCounterOnStartup`・`startSyncEngine` を呼ぶ配線をここに置いている。`CheckoutScreen`（`screens/checkout/`）を描画する。画面を追加する際も、この起動時フックの位置は変えないこと
 - `src/screens/checkout/` — SC-01 会計画面 ＋ SC-02 精算モーダル。`CheckoutScreen.tsx` が親で、`CategoryTabs`・`ProductGrid`・`Numpad`・`TicketPanel`・`TicketLineRow`・`PaymentModal` に分割している。スタイルは `CheckoutScreen.module.css`（CSS Modules）に集約し、他コンポーネントもここから import する。**hydration ガードはヘッダーの外側にだけかける**（`ticketHydrated && masterHydrated` が false の間は本文だけ「読み込み中」にし、ヘッダーは常に表示する。空の伝票が一瞬見えてから中身が現れる「ちらつき」を防ぐ設計。詳細はタスク13の完了報告を参照）。確認ダイアログ（伝票クリア・削除・会計確定）は `window.confirm` を使う（専用ダイアログコンポーネントはまだ無いため）。会計確定（FR-11）は `CheckoutScreen.handleConfirmSale` が `data/sync/checkout.ts` の `confirmSale` を呼ぶ形で実装済み。`PaymentModal` の `onConfirm` は預かり金（`Yen`）を引数に取る
 - `PaymentModal` は `total` を props で受け取らない。**合計金額は必ず `ticketTotal(lines)` から計算すること。** `total` を別 prop として渡す設計にしたところ、`canConfirm()` が内部で `lines` から独自に合計を再計算するため、渡した `total` と実際の `lines` の中身が食い違うとテストが誤って通ってしまう事故が実際に起きた（タスク14）。合計が絡む値は常に `lines` 1箇所から導出し、並行して別経路で渡さないこと
 

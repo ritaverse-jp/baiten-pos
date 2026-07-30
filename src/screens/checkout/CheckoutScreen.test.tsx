@@ -5,6 +5,7 @@ import { saveConfig } from '@/data/db/config'
 import { getAllPendingSales } from '@/data/db/pendingQueue'
 import { getAllSales } from '@/data/db/sales'
 import { db } from '@/data/db/schema'
+import { __resetSyncEngineForTests } from '@/data/sync/engine'
 import { toTerminalCode, toYen, type Category, type Product } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
 import { useSyncStore } from '@/state/syncStore'
@@ -50,6 +51,7 @@ function seedMasters(products: Product[], categories: Category[]) {
 }
 
 beforeEach(async () => {
+  __resetSyncEngineForTests()
   await db.currentTicket.clear()
   await db.products.clear()
   await db.categories.clear()
@@ -64,6 +66,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('起動時の復元とちらつき対策（NF-04）', () => {
@@ -488,5 +491,45 @@ describe('会計確定フロー（FR-11・design 4.1・不変条件9）', () => 
     expect(await getAllPendingSales()).toEqual([])
     // モーダルは開いたままで、預かり金の再入力からやり直せる
     expect(screen.getByRole('dialog', { name: '精算' })).toBeInTheDocument()
+  })
+})
+
+describe('会計確定時の自動同期（design 4.1「会計確定時」トリガー）', () => {
+  test('会計確定の直後に自動的に送信が試みられ、成功すればキューから消える', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await saveConfig({ gasUrl: 'https://script.google.com/macros/s/FAKE/exec', apiToken: 'tok', terminalCode: toTerminalCode('A') })
+    seedMasters([KARAAGE], [FOOD])
+
+    const fetchMock = vi.fn().mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: { results: body.sales.map((s: { saleId: string }) => ({ saleId: s.saleId, status: 'appended' })) },
+        }),
+        { status: 200 },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<CheckoutScreen />)
+    await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
+    await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
+    await user.click(screen.getByRole('button', { name: '精算へ' }))
+    await user.click(screen.getByRole('button', { name: 'ちょうど' }))
+
+    await user.click(screen.getByRole('button', { name: '会計確定' }))
+
+    // handleConfirmSale が確定直後に runSync() を fire-and-forget で呼ぶ
+    // （design 4.1「会計確定時」）。appendSales の成功応答を経て、
+    // キューが自動的に空になる
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await waitFor(async () => {
+      expect(await getAllPendingSales()).toEqual([])
+    })
+    await waitFor(() => {
+      expect(useSyncStore.getState().connection).toBe('online')
+    })
   })
 })

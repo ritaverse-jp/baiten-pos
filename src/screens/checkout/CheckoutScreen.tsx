@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { confirmSale, CONFIRM_SALE_ERROR_MESSAGES } from '@/data/sync/checkout'
+import { runSync } from '@/data/sync/engine'
 import { ticketErrorMessage } from '@/domain/ticket'
 import type { Yen } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
@@ -96,6 +97,10 @@ export default function CheckoutScreen() {
     // ここでは画面（Zustand の in-memory 状態）側を空に戻すだけでよい
     await useTicketStore.getState().clear()
     await useSyncStore.getState().refreshPendingCount()
+
+    // design 4.1 の起動契機「会計確定時」。fire-and-forget（確定自体は
+    // 既にローカルで完了しているため、送信の成否を待って画面を止めない）
+    void runSync()
   }
 
   const visibleProducts = products.filter((p) => p.categoryName === selectedCategory)
