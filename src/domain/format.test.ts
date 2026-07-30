@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { formatProductNo, formatYen } from './format'
-import { toYen } from './types'
+import { formatProductNo, formatTime, formatYen } from './format'
+import { toYen, type IsoDateTime } from './types'
 
 describe('formatProductNo', () => {
   test('1〜20は丸数字にする', () => {
@@ -32,5 +32,16 @@ describe('formatYen', () => {
 
   test('マイナスの金額（取消行相当）も表示できる', () => {
     expect(formatYen(toYen(-500))).toBe('-500円')
+  })
+})
+
+describe('formatTime', () => {
+  test('明示的な+09:00表記（GAS getSalesHistory由来）はそのままJSTとして表示する', () => {
+    expect(formatTime('2026-07-30T14:32:00+09:00' as IsoDateTime)).toBe('14:32')
+  })
+
+  test('UTC・Z表記（ローカルのSaleRecord.confirmedAt由来）もJSTに変換して表示する', () => {
+    // 2026-07-30T05:32:00Z は JST で 14:32
+    expect(formatTime('2026-07-30T05:32:00.000Z' as IsoDateTime)).toBe('14:32')
   })
 })

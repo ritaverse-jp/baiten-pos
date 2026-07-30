@@ -54,6 +54,10 @@ function handleRequest_(e, method) {
         return respondOk_(saveCategory(params))
       case 'deleteCategory':
         return respondOk_(deleteCategory(params))
+      case 'getSalesHistory':
+        return respondOk_(getSalesHistory(params))
+      case 'cancelSale':
+        return respondOk_(cancelSale(params))
       default:
         throw new ApiError('VALIDATION_ERROR', '不明な action です: ' + action)
     }

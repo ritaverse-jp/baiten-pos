@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import CategoriesScreen from '@/screens/categories/CategoriesScreen'
 import CheckoutScreen from '@/screens/checkout/CheckoutScreen'
+import HistoryScreen from '@/screens/history/HistoryScreen'
 import ProductsScreen from '@/screens/products/ProductsScreen'
 import { reconcileCounterOnStartup } from '@/data/sync/counter'
 import { startSyncEngine } from '@/data/sync/engine'
@@ -9,7 +10,7 @@ import { useSyncStore } from '@/state/syncStore'
 import { useTicketStore } from '@/state/ticketStore'
 
 /** 画面遷移。ルーティングライブラリを使うほどの規模ではないため単純な状態切り替えにする */
-type View = 'checkout' | 'products' | 'categories'
+type View = 'checkout' | 'products' | 'categories' | 'history'
 
 export default function App() {
   const [view, setView] = useState<View>('checkout')
@@ -43,5 +44,8 @@ export default function App() {
   if (view === 'categories') {
     return <CategoriesScreen onBack={() => setView('products')} />
   }
-  return <CheckoutScreen onNavigateToProducts={() => setView('products')} />
+  if (view === 'history') {
+    return <HistoryScreen onBack={() => setView('checkout')} />
+  }
+  return <CheckoutScreen onNavigateToProducts={() => setView('products')} onNavigateToHistory={() => setView('history')} />
 }

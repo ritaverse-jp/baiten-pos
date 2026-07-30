@@ -243,6 +243,22 @@ export interface SaleRecord extends SalePayload {
   canceledAt: IsoDateTime | null
 }
 
+/**
+ * SC-05 会計履歴画面（`domain/history.ts`）が扱う統一形式。ローカル（`SaleRecord`）・
+ * リモート（`SalesHistoryEntry`）のどちらから来たかを画面側が意識しなくてよいようにする。
+ */
+export interface HistoryEntry {
+  saleId: SaleId
+  terminalCode: TerminalCode
+  confirmedAt: IsoDateTime
+  lines: SaleLine[]
+  total: Yen
+  /** GAS に受理済みか。未送信キューに残っている間は false（取消不可の判定に使う） */
+  synced: boolean
+  canceled: boolean
+  canceledAt: IsoDateTime | null
+}
+
 // ============================================================
 // 未送信キュー・採番カウンタ・端末設定（Dexie。docs/design.md 3.3）
 // ============================================================
@@ -484,9 +500,33 @@ export interface GetSalesHistoryRequest extends AuthedRequest {
   date: DateKey
 }
 
+/**
+ * `getSalesHistory` が1会計につき1件返すエントリ。売上ログは1会計1行ではなく
+ * 明細行単位（1商品1行）で記録されるため、GAS 側で `saleId` ごとにグルーピング
+ * して組み立てる（gas/Sales.js）。`lines` は確定時点の明細（取消の負数行は含まない）。
+ *
+ * `SalePayload` を再利用しなかったのは、`SalePayload` が「取消済みかどうか」を
+ * 表現できないため（取消は同じ `saleId` で負数行を追記するだけなので、素朴に
+ * シートの全行を `lines` に詰めると正の行と負の行が混ざってしまう）。
+ */
+export interface SalesHistoryEntry {
+  saleId: SaleId
+  terminalCode: TerminalCode
+  confirmedAt: IsoDateTime
+  /** 会計単位の備考。取消行自身の備考（`取消（元会計番号）`）は含まない */
+  note: string
+  /** 確定時点の明細（正の数量のみ）。取消の負数行はここに含めず `canceled` で表現する */
+  lines: SaleLine[]
+  /** `lines` の小計の総和（取消の有無に関わらず、確定時点の金額） */
+  total: Yen
+  /** この `saleId` に取消の負数行が1件以上存在するか */
+  canceled: boolean
+  canceledAt: IsoDateTime | null
+}
+
 export interface GetSalesHistoryResponse {
   /** 全端末分を統合して返す（要件定義 5.4 の「履歴の統合」） */
-  sales: SalePayload[]
+  sales: SalesHistoryEntry[]
 }
 
 /**

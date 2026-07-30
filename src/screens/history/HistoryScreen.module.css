@@ -1,0 +1,150 @@
+/* SC-05 会計履歴（要件定義 FR-14・FR-15）。products/categories と共通のトーンで揃える */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #f3f4f6;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #1f2937;
+  color: #ffffff;
+  gap: 0.5rem;
+}
+
+.headerTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.connectionBadge {
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.connectionOnline {
+  background: #065f46;
+  color: #ecfdf5;
+}
+
+.connectionOffline {
+  background: #7f1d1d;
+  color: #fef2f2;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.loadNotice {
+  margin: 0 1rem;
+  padding: 0.75rem;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 8px;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.625rem 0.875rem;
+}
+
+.rowCanceled {
+  opacity: 0.6;
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.rowTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.rowTime {
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowSaleId {
+  color: #4b5563;
+  font-size: 0.875rem;
+}
+
+.rowLines {
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.rowTotal {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem; /* 要件定義 7.3：金額表示は最低24pt */
+}
+
+.statusBadge {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.statusBadgePending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusBadgeCanceled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.rowActions {
+  flex-shrink: 0;
+}
+
+.emptyMessage {
+  color: #6b7280;
+  padding: 1rem;
+}

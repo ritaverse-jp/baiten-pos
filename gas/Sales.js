@@ -1,11 +1,9 @@
 /**
- * `appendSales`・`getTodayMaxSeq` エンドポイント。docs/design.md 2.4・2.5 参照。
+ * `appendSales`・`getTodayMaxSeq`・`getSalesHistory`・`cancelSale` エンドポイント。
+ * docs/design.md 2.4・2.5・2.6.1・2.7 参照。
  *
  * `getTodayMaxSeq` は design 2.9 のファイル表では明記していなかったが、
  * 売上ログのタブ・列を直接読む点で appendSales と関心が近いためここに置く。
- *
- * `getSalesHistory`・`cancelSale`（design 2.9 のファイル構成でこのファイルに
- * 割り当て済み）は未実装。対応するタスクで追加する。
  */
 
 var SALES_SHEET_PREFIX = '売上ログ_'
@@ -199,4 +197,200 @@ function getTodayMaxSeq(params) {
   }
 
   return { maxSeq: maxSeq }
+}
+
+/**
+ * 指定日の会計履歴を全端末分まとめて返す（design 2.6.1・FR-14）。
+ * ロック不要（読み取り専用。design 2.4 の「同時追記」対策はロックの目的であり、
+ * 読み取りだけならロックを取らなくても不整合は起きない）。
+ *
+ * 売上ログは1商品1行（design 8.2）のため、`saleId`（C列）でグルーピングして
+ * 1会計1エントリに組み立て直す。取消（design 2.7）は同じ `saleId` で個数が
+ * マイナスの行を追記する方式のため、正の行（確定時点の明細）と負の行
+ * （取消の記録）を分けて扱う：正の行から `lines`/`total` を組み立て、
+ * 負の行が1件でもあれば `canceled: true` とする。
+ */
+function getSalesHistory(params) {
+  // 全端末分の履歴を返す（design task18「オンライン時は全端末分」）ため、
+  // 参照自体は認証済みであれば端末を問わない
+  requireAuth_(params)
+
+  var date = params && params.date
+  if (!date || !/^\d{8}$/.test(date)) {
+    throw new ApiError('VALIDATION_ERROR', 'date は YYYYMMDD 形式で指定してください')
+  }
+
+  var tabName = SALES_SHEET_PREFIX + date.slice(0, 6)
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName)
+  if (!sheet) return { sales: [] }
+
+  var lastRow = sheet.getLastRow()
+  if (lastRow < 2) return { sales: [] }
+
+  var targetDateStr = date.slice(0, 4) + '/' + date.slice(4, 6) + '/' + date.slice(6, 8)
+  var rows = sheet.getRange(2, 1, lastRow - 1, SALES_SHEET_HEADERS.length).getValues()
+
+  var groups = {} // saleId -> { originalRows: [][], cancelRows: [][] }
+  var order = [] // saleId の初出順（グルーピング後の表示順を安定させる）
+
+  rows.forEach(function (row) {
+    if (cellDateString_(row[0]) !== targetDateStr) return
+    var saleId = row[2]
+    if (!saleId) return
+    if (!groups[saleId]) {
+      groups[saleId] = { originalRows: [], cancelRows: [] }
+      order.push(saleId)
+    }
+    if (row[6] < 0) {
+      groups[saleId].cancelRows.push(row)
+    } else {
+      groups[saleId].originalRows.push(row)
+    }
+  })
+
+  var sales = order
+    .map(function (saleId) {
+      return buildSalesHistoryEntry_(saleId, groups[saleId])
+    })
+    .filter(function (entry) {
+      return entry !== null
+    })
+
+  return { sales: sales }
+}
+
+/** 1件の `saleId` グループから `SalesHistoryEntry`（domain/types.ts）を組み立てる */
+function buildSalesHistoryEntry_(saleId, group) {
+  // 正の行が1件も無い（負の行しか無い）状態は本来起こらないが、防御的に除外する
+  if (group.originalRows.length === 0) return null
+
+  var first = group.originalRows[0]
+  var lines = group.originalRows
+    .map(function (row) {
+      return { lineNo: row[10], productName: row[4], netUnitPrice: row[5], qty: row[6], subtotal: row[7], discount: row[8] }
+    })
+    .sort(function (a, b) {
+      return a.lineNo - b.lineNo
+    })
+
+  var total = group.originalRows.reduce(function (sum, row) {
+    return sum + row[7]
+  }, 0)
+
+  var canceled = group.cancelRows.length > 0
+  var canceledAt = canceled ? isoFromCells_(group.cancelRows[0][0], group.cancelRows[0][1]) : null
+
+  return {
+    saleId: saleId,
+    terminalCode: first[3],
+    confirmedAt: isoFromCells_(first[0], first[1]),
+    note: first[9],
+    lines: lines,
+    total: total,
+    canceled: canceled,
+    canceledAt: canceledAt,
+  }
+}
+
+/**
+ * 会計の取消（design 2.7・FR-15）。元会計の全行を読み、個数・小計をマイナスに
+ * した行を追記する。元の行は削除しない（追記専用の原則。design 1.1・4.4）。
+ *
+ * 未送信の会計は取り消せない【確定】：シートに載っていない（＝まだ未送信
+ * キューに残っている）会計は、そもそも該当行が見つからないため
+ * VALIDATION_ERROR になる。クライアント側は加えて、履歴画面で未送信の
+ * 会計の取消ボタンをあらかじめ非活性にする（design 2.7・CLAUDE.md）。
+ *
+ * 重複チェック・追記を同一ロック内で行うのは appendSales と同じ理由
+ * （check-then-act の競合を避ける。design 2.8）。既に取消済み（負の行が
+ * 既に存在する）場合は再度の取消を拒否し、二重の負数計上を防ぐ。
+ */
+function cancelSale(params) {
+  var terminalCode = requireAuth_(params)
+  var saleId = params && params.saleId
+  if (typeof saleId !== 'string' || !saleId) {
+    throw new ApiError('VALIDATION_ERROR', 'saleId は必須です')
+  }
+  var datePart = saleId.slice(0, 8)
+  if (!/^\d{8}$/.test(datePart)) {
+    throw new ApiError('VALIDATION_ERROR', 'saleId の形式が不正です: ' + saleId)
+  }
+
+  var lock = LockService.getScriptLock()
+  try {
+    lock.waitLock(LOCK_WAIT_MS)
+  } catch (err) {
+    throw new ApiError('LOCK_TIMEOUT', 'ロックを取得できませんでした。しばらくしてから再試行してください')
+  }
+
+  try {
+    var tabName = SALES_SHEET_PREFIX + datePart.slice(0, 6)
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName)
+    var lastRow = sheet ? sheet.getLastRow() : 0
+    if (!sheet || lastRow < 2) {
+      throw new ApiError('VALIDATION_ERROR', '指定された会計が見つかりません（未送信の可能性があります）: ' + saleId)
+    }
+
+    var rows = sheet.getRange(2, 1, lastRow - 1, SALES_SHEET_HEADERS.length).getValues()
+    var originalRows = []
+    var alreadyCanceled = false
+    rows.forEach(function (row) {
+      if (row[2] !== saleId) return
+      if (row[6] < 0) {
+        alreadyCanceled = true
+      } else {
+        originalRows.push(row)
+      }
+    })
+
+    if (originalRows.length === 0) {
+      throw new ApiError('VALIDATION_ERROR', '指定された会計が見つかりません（未送信の可能性があります）: ' + saleId)
+    }
+    if (alreadyCanceled) {
+      throw new ApiError('VALIDATION_ERROR', 'この会計は既に取消済みです: ' + saleId)
+    }
+
+    var now = new Date()
+    var dateStr = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd')
+    var timeStr = Utilities.formatDate(now, 'Asia/Tokyo', 'HH:mm')
+    var note = '取消（' + saleId + '）'
+
+    // 個数（G列）・小計（H列）のみマイナスにする。金額（F列）・割引額（I列）は
+    // そのまま据え置く（design 2.7：「個数と小計をマイナスにした行を追記する」）
+    var cancelRows = originalRows.map(function (row) {
+      return [dateStr, timeStr, saleId, terminalCode, row[4], row[5], -row[6], -row[7], row[8], note, row[10]]
+    })
+
+    sheet.getRange(sheet.getLastRow() + 1, 1, cancelRows.length, SALES_SHEET_HEADERS.length).setValues(cancelRows)
+
+    logOperation_(terminalCode, '会計取消', '会計番号 ' + saleId, { canceledRows: cancelRows.length })
+
+    return { saleId: saleId, canceledAt: now.toISOString() }
+  } finally {
+    lock.releaseLock()
+  }
+}
+
+/**
+ * A列（日付）・B列（時刻）は文字列として書き込むが、スプレッドシート側の
+ * 自動書式認識により Date 型のセルとして保存され得る。読み取り時はどちらの
+ * 型でも対応できるよう、Date であれば改めてフォーマットし直す。
+ */
+function cellDateString_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    return Utilities.formatDate(value, 'Asia/Tokyo', 'yyyy/MM/dd')
+  }
+  return String(value)
+}
+
+function cellTimeString_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    return Utilities.formatDate(value, 'Asia/Tokyo', 'HH:mm')
+  }
+  return String(value)
+}
+
+/** A列・B列のセル値から ISO 8601（JST）を組み立てる。秒以下は保持していないため 00 固定 */
+function isoFromCells_(dateCell, timeCell) {
+  return cellDateString_(dateCell).replace(/\//g, '-') + 'T' + cellTimeString_(timeCell) + ':00+09:00'
 }

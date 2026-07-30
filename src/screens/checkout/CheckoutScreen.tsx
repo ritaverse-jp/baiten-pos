@@ -25,11 +25,13 @@ const HIGHLIGHT_DURATION_MS = 600
  * （確定後に非同期でキューを送信する。design 4.1 手順4）はタスク16の担当。
  */
 interface CheckoutScreenProps {
-  /** SC-03 商品マスタ管理への遷移（タスク17）。履歴・設定はタスク18・19まで未実装のため無効ボタンのまま残す */
+  /** SC-03 商品マスタ管理への遷移（タスク17） */
   onNavigateToProducts: () => void
+  /** SC-05 会計履歴への遷移（タスク18）。設定はタスク19まで未実装のため無効ボタンのまま残す */
+  onNavigateToHistory: () => void
 }
 
-export default function CheckoutScreen({ onNavigateToProducts }: CheckoutScreenProps) {
+export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHistory }: CheckoutScreenProps) {
   const ticketHydrated = useTicketStore((s) => s.hydrated)
   const lines = useTicketStore((s) => s.lines)
   const note = useTicketStore((s) => s.note)
@@ -118,8 +120,8 @@ export default function CheckoutScreen({ onNavigateToProducts }: CheckoutScreenP
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>売店レジ</h1>
         <nav className={styles.headerNav} aria-label="画面切り替え">
-          {/* 履歴・設定への遷移はタスク18・19で実装する */}
-          <button type="button" disabled>
+          {/* 設定への遷移はタスク19で実装する */}
+          <button type="button" onClick={onNavigateToHistory}>
             履歴
           </button>
           <button type="button" onClick={onNavigateToProducts}>

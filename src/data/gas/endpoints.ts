@@ -153,11 +153,7 @@ export async function deleteCategory(name: DeleteCategoryRequest['name']): Promi
 }
 
 // ============================================================
-// 履歴・取消（design 2.7 / FR-14・FR-15）
-//
-// GAS 側（getSalesHistory・cancelSale）はタスク18で実装する。ここでの
-// ラッパーは types.ts の定義との対応を先に用意しておくもので、現時点では
-// 呼び出しても GAS 側が VALIDATION_ERROR（不明な action）を返す。
+// 履歴・取消（design 2.6.1・2.7 / FR-14・FR-15。タスク18）
 // ============================================================
 
 export async function getSalesHistory(date: GetSalesHistoryRequest['date']): Promise<ApiResponse<GetSalesHistoryResponse>> {
