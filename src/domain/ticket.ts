@@ -9,7 +9,7 @@
  * （未送信の会計は取り消せない。CLAUDE.md）はここでは扱わない。
  */
 
-import { validateDiscount, validateQty, type CalcError } from './calc'
+import { CALC_ERROR_MESSAGES, validateDiscount, validateQty, type CalcError } from './calc'
 import { toYen, type Product, type TicketLine } from './types'
 
 export type TicketError =
@@ -32,6 +32,18 @@ export const TICKET_ERROR_MESSAGES: Record<Exclude<TicketError, CalcError>, stri
   lineNotFound: '対象の行が見つかりません',
   splitQtyTooSmall: '分割する数量は1以上にしてください',
   splitQtyTooLarge: '分割する数量は元の個数未満にしてください',
+}
+
+/**
+ * `TicketError`（`TicketError` 固有のコード ＋ `CalcError`）から日本語メッセージを
+ * 引く。画面はエラーコードの出自（ticket.ts か calc.ts か）を意識せず、
+ * この関数だけ呼べばよい。
+ */
+export function ticketErrorMessage(error: TicketError): string {
+  if (error in TICKET_ERROR_MESSAGES) {
+    return TICKET_ERROR_MESSAGES[error as Exclude<TicketError, CalcError>]
+  }
+  return CALC_ERROR_MESSAGES[error as CalcError]
 }
 
 // ============================================================

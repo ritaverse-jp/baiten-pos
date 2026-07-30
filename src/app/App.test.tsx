@@ -2,15 +2,21 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, test } from 'vitest'
 import { db } from '@/data/db/schema'
 import { toYen, type Product } from '@/domain/types'
+import { useMasterStore } from '@/state/masterStore'
+import { useSyncStore } from '@/state/syncStore'
 import { useTicketStore } from '@/state/ticketStore'
 import App from './App'
 
 beforeEach(async () => {
   await db.currentTicket.clear()
+  await db.products.clear()
+  await db.categories.clear()
   useTicketStore.setState({ lines: [], note: '', hydrated: false })
+  useMasterStore.setState({ products: [], categories: [], hydrated: false })
+  useSyncStore.setState({ connection: 'unknown', pendingCount: 0, syncing: false, lastSyncedAt: null, blockedBy: null })
 })
 
-test('アプリのシェルが描画される', () => {
+test('アプリのシェルが描画される。ヘッダーは復元中でも常に表示する', () => {
   render(<App />)
   expect(screen.getByRole('heading', { name: '売店レジ' })).toBeInTheDocument()
 })
@@ -32,9 +38,8 @@ test('起動時にIndexedDBの入力中伝票を復元する（NF-04：再読み
   render(<App />)
 
   await waitFor(() => {
-    expect(useTicketStore.getState().hydrated).toBe(true)
+    expect(screen.getByText('からあげ串')).toBeInTheDocument()
   })
   expect(useTicketStore.getState().lines).toHaveLength(1)
   expect(useTicketStore.getState().lines[0].productNo).toBe(1)
-  expect(screen.getByText('伝票を復元しました', { exact: false })).toBeInTheDocument()
 })

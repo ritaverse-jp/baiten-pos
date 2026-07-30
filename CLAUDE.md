@@ -13,7 +13,7 @@
 
 ## 現在の状態
 
-`docs/design.md` 7章の実装タスクのうち、**タスク12（状態管理＋伝票永続化）まで完了**。次はタスク13（SC-01 会計画面）。
+`docs/design.md` 7章の実装タスクのうち、**タスク13（SC-01 会計画面）まで完了**。次はタスク14（SC-02 精算モーダル）。
 
 GAS はデプロイ済み（コンテナバインド型、Webアプリとして公開）。Webアプリ URL はユーザーが把握しており、`.clasp.json`（gitignore 済み）に紐づく。`registerTerminal` の実装により、`getMasters`・`appendSales`・`getTodayMaxSeq`・`saveProduct`/`deleteProduct`/`saveCategory`/`deleteCategory` を実トークンでの一気通貫フローとして curl で確認済み。カスタムメニュー（`onOpen`／Menu.js）はユーザーが実際にスプレッドシートUIから操作して確認済み。PIN のハッシュ値は Script Properties の `pinHash` にユーザーが直接設定済み（PIN 自体はアシスタントには開示していない運用）。
 
@@ -43,13 +43,18 @@ GAS はデプロイ済み（コンテナバインド型、Webアプリとして�
 - `src/state/ticketStore.ts`（Zustand） — 入力中伝票。**すべての変更操作は `domain/ticket.ts` に委譲し、成功時のみ書き込みのたびに `currentTicket` テーブルへ保存する**（NF-04）。画面はストアのアクション（`addProductByNo` 等）だけを呼び、`lines` 配列を直接書き換えないこと
 - `src/state/masterStore.ts`（Zustand） — 商品・カテゴリのキャッシュ。`replace()` が `data/db/masters.ts` の丸ごと置き換えとストアの更新を同時に行う。1件ずつの更新はここにも生やさないこと
 - `src/state/syncStore.ts`（Zustand） — 接続状態・未送信件数・同期状態。`connection` を書き換えるのは同期エンジン（タスク16）の責務。ここは `SyncState`（`domain/types.ts`）をそのまま状態として使っている
-- `src/app/App.tsx` — 起動時に3ストアの `hydrate()` を呼ぶ配線をここに置いている。画面（タスク13〜）を追加する際も、この起動時フックの位置は変えないこと
+- `src/domain/format.ts` — 商品 No. の丸数字表示・金額の3桁区切り表示。React に依存しない純粋関数（要件定義 6.2・7.2）
+- `src/domain/ticket.ts` の `ticketErrorMessage()` — `TicketError`（`TicketError` 固有＋`CalcError`）から日本語メッセージを引く統合関数。画面はこれだけ呼べばよく、エラーの出自（ticket.ts か calc.ts か）を気にしなくてよい
+- `src/app/App.tsx` — 起動時に3ストアの `hydrate()` を呼ぶ配線をここに置いている。`CheckoutScreen`（`screens/checkout/`）を描画する。画面を追加する際も、この起動時フックの位置は変えないこと
+- `src/screens/checkout/` — SC-01 会計画面。`CheckoutScreen.tsx` が親で、`CategoryTabs`・`ProductGrid`・`Numpad`・`TicketPanel`・`TicketLineRow` に分割している。スタイルは `CheckoutScreen.module.css`（CSS Modules）に集約し、他コンポーネントもここから import する。**hydration ガードはヘッダーの外側にだけかける**（`ticketHydrated && masterHydrated` が false の間は本文だけ「読み込み中」にし、ヘッダーは常に表示する。空の伝票が一瞬見えてから中身が現れる「ちらつき」を防ぐ設計。詳細はタスク13の完了報告を参照）。確認ダイアログ（伝票クリア・削除）は `window.confirm` を使う（専用ダイアログコンポーネントはまだ無いため）。「精算へ」ボタンは活性制御のみでモーダルは未実装（タスク14）
 
-テストで IndexedDB を使う場合は `fake-indexeddb/auto`（`src/test/setup.ts` で読み込み済み）が有効なので追加の対応は不要。各アクセサのテストは対象テーブルを `beforeEach` で `clear()` してから実行する（同一 Dexie インスタンスをテスト間で共有しているため）。Zustand ストアのテストも同様に `beforeEach` で `useXxxStore.setState({...初期値})` してから実行する（ストアはモジュールレベルのシングルトンでテスト間を跨いで状態が残るため）。`data/gas/` のテストは `vi.stubGlobal('fetch', ...)` でモックする。実機確認をしたい場合は一時的な `*.test.ts` を作って `npx vitest run <path>` で個別実行し、確認後に削除すること（自動テストスイートに実ネットワーク依存のテストを含めない）。
+CSS Modules を使うコンポーネントをテストするとき、クラス名はハッシュ化される（`_ticketTotalAmount_xxxxx`）ため、`{ selector: '.className' }` のような生のクラス名指定では要素を見つけられない。**曖昧になりうる要素（同じテキストが複数箇所に出る等）は `data-testid` を振るか `within()` でスコープを絞ること。** 商品ボタン等インタラクティブ要素には明示的な `aria-label` を付け、`getByRole('button', { name: ... })` が正規表現で複数ヒットしないようにする（同じ商品名を含むボタンが1行に複数存在しうるため）。
+
+テストで IndexedDB を使う場合は `fake-indexeddb/auto`（`src/test/setup.ts` で読み込み済み）が有効なので追加の対応は不要。各アクセサのテストは対象テーブルを `beforeEach` で `clear()` してから実行する（同一 Dexie インスタンスをテスト間で共有しているため）。Zustand ストアのテストも同様に `beforeEach` で `useXxxStore.setState({...初期値})` してから実行する（ストアはモジュールレベルのシングルトンでテスト間を跨いで状態が残るため）。`data/gas/` のテストは `vi.stubGlobal('fetch', ...)` でモックする。実機確認をしたい場合は一時的な `*.test.ts` を作って `npx vitest run <path>` で個別実行し、確認後に削除すること（自動テストスイートに実ネットワーク依存のテストを含めない）。UI コンポーネントのテストは `@testing-library/react` ＋ `@testing-library/user-event` を使う。
 
 `src/` 配下の他のディレクトリは設計 3.1 の構成で用意済みだが、まだ空。
 
-**タスク13以降で必ず対応すること：** `data/sync/counter.ts` の `reconcileCounterOnStartup` は実装済みだが、呼び出し元（会計画面表示前）がまだ配線されていない。会計を開始する前に必ずこれを呼び、`'blocked'` が返ったら会計開始をブロックしてその旨を表示すること（設計 5.3）。
+**タスク15（会計確定フロー）着手時に必ず対応すること：** `data/sync/counter.ts` の `reconcileCounterOnStartup` は実装済みだが、呼び出し元（会計確定処理の直前）がまだ配線されていない。会計を開始する前に必ずこれを呼び、`'blocked'` が返ったら会計開始をブロックしてその旨を表示すること（設計 5.3）。タスク13の時点では会計確定処理自体が無いため配線していない。
 
 ## 技術スタック（確定・変更不可）
 
