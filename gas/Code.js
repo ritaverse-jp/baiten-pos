@@ -46,6 +46,8 @@ function handleRequest_(e, method) {
         return respondOk_(login(params))
       case 'refreshToken':
         return respondOk_(refreshToken(params))
+      case 'renameTerminal':
+        return respondOk_(renameTerminal(params))
       case 'saveProduct':
         return respondOk_(saveProduct(params))
       case 'deleteProduct':

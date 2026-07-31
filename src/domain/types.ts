@@ -409,6 +409,16 @@ export interface AuthResponse {
   expiresAt: IsoDateTime
 }
 
+/** 端末名の変更（`端末` タブ B列）。トークン再発行は伴わない */
+export interface RenameTerminalRequest extends AuthedRequest {
+  terminalName: string
+}
+
+export interface RenameTerminalResponse {
+  terminalCode: TerminalCode
+  terminalName: string
+}
+
 // --- マスタ取得（docs/design.md 2.3） ---
 
 export interface GetMastersRequest extends AuthedRequest {}

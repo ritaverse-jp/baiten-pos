@@ -179,8 +179,30 @@ describe('登録済み・通常運転（blockedByなし）', () => {
     render(<SettingsScreen onBack={() => {}} />)
 
     await waitFor(() => expect(screen.getByText('未送信データ（1件）')).toBeInTheDocument())
-    expect(screen.getByText('レジ1')).toBeInTheDocument()
+    expect(screen.getByLabelText('端末名')).toHaveValue('レジ1')
     expect(screen.getByText('2026/10/28')).toBeInTheDocument()
+  })
+
+  test('端末名の変更に成功すると入力欄に反映される', async () => {
+    const user = userEvent.setup()
+    render(<SettingsScreen onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByLabelText('端末名')).toHaveValue('レジ1'))
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ ok: true, data: { terminalCode: 'A', terminalName: 'レジ2' } }),
+    )
+
+    await user.clear(screen.getByLabelText('端末名'))
+    await user.type(screen.getByLabelText('端末名'), 'レジ2')
+    await user.click(screen.getByRole('button', { name: '端末名を変更' }))
+
+    await waitFor(() => expect(screen.getByLabelText('端末名')).toHaveValue('レジ2'))
+  })
+
+  test('入力欄を変更していなければ「端末名を変更」は非活性', async () => {
+    render(<SettingsScreen onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByLabelText('端末名')).toHaveValue('レジ1'))
+    expect(screen.getByRole('button', { name: '端末名を変更' })).toBeDisabled()
   })
 
   test('未送信が無ければ「今すぐ同期」は非活性', async () => {

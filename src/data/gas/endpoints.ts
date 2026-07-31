@@ -28,6 +28,7 @@ import type {
   LoginRequest,
   Product,
   RegisterTerminalRequest,
+  RenameTerminalResponse,
   SaveCategoryResponse,
   SaveProductResponse,
   DateKey,
@@ -83,6 +84,18 @@ export async function refreshToken(): Promise<ApiResponse<AuthResponse>> {
   const auth = await requireAuthedConfig()
   if (!auth) return notConfigured()
   return postToGas(auth.gasUrl, { action: 'refreshToken', apiToken: auth.apiToken, terminalCode: auth.terminalCode })
+}
+
+/** 端末名の変更（design 1.4 `端末` タブ B列）。現行の有効なトークンで認証する（PIN 不要） */
+export async function renameTerminal(terminalName: string): Promise<ApiResponse<RenameTerminalResponse>> {
+  const auth = await requireAuthedConfig()
+  if (!auth) return notConfigured()
+  return postToGas(auth.gasUrl, {
+    action: 'renameTerminal',
+    apiToken: auth.apiToken,
+    terminalCode: auth.terminalCode,
+    terminalName,
+  })
 }
 
 // ============================================================

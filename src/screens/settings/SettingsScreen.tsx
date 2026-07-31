@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getConfig, saveConfig } from '@/data/db/config'
 import { getAllPendingSales } from '@/data/db/pendingQueue'
-import { login, ping, registerTerminal } from '@/data/gas/endpoints'
+import { login, ping, registerTerminal, renameTerminal } from '@/data/gas/endpoints'
 import { runSync } from '@/data/sync/engine'
 import { saleLinesTotal } from '@/domain/calc'
 import { pendingSalesToCsv } from '@/domain/csv'
@@ -56,11 +56,16 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [reLoginError, setReLoginError] = useState<string | null>(null)
   const [reLoginSubmitting, setReLoginSubmitting] = useState(false)
 
+  const [renameInput, setRenameInput] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState(false)
+
   const load = async () => {
     setLoading(true)
     const [nextConfig, nextPending] = await Promise.all([getConfig(), getAllPendingSales()])
     setConfig(nextConfig)
     setGasUrlInput(nextConfig.gasUrl ?? '')
+    setRenameInput(nextConfig.terminalName ?? '')
     setPendingSales(nextPending)
     setLoading(false)
   }
@@ -140,6 +145,26 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     await load()
     // design 6.6：「成功後に自動で同期再開」
     void runSync()
+  }
+
+  /** 端末名の変更（`端末` タブ B列。design 1.4）。表示用の名称変更のみで PIN は不要 */
+  const handleRename = async () => {
+    const error = validateTerminalName(renameInput)
+    if (error) {
+      setRenameError(TERMINAL_NAME_ERROR_MESSAGES[error])
+      return
+    }
+    setRenameError(null)
+    setRenaming(true)
+    const result = await renameTerminal(renameInput)
+    setRenaming(false)
+    if (!result.ok) {
+      setRenameError(result.error.message)
+      return
+    }
+
+    await saveConfig({ terminalName: result.data.terminalName })
+    await load()
   }
 
   const handleForceSync = async () => {
@@ -268,10 +293,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                   <span className={styles.infoLabel}>端末コード</span>
                   <span>{config.terminalCode}</span>
                 </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>端末名</span>
-                  <span>{config.terminalName}</span>
-                </div>
                 {config.tokenExpiresAt && (
                   <div className={styles.infoRow}>
                     <span className={styles.infoLabel}>トークン有効期限</span>
@@ -279,6 +300,22 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                   </div>
                 )}
               </div>
+              <div className={styles.formField}>
+                <label htmlFor="rename-terminal">端末名</label>
+                <input id="rename-terminal" type="text" value={renameInput} onChange={(e) => setRenameInput(e.target.value)} />
+              </div>
+              {renameError && (
+                <p className={styles.errorText} role="alert">
+                  {renameError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleRename()}
+                disabled={renaming || renameInput === config.terminalName}
+              >
+                {renaming ? '変更中…' : '端末名を変更'}
+              </button>
             </section>
 
             {blockedBy === 'tokenExpired' && (

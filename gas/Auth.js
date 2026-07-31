@@ -120,6 +120,42 @@ function refreshToken(params) {
 }
 
 /**
+ * 端末名の変更（`端末` タブ B列。design 1.4）。現行の有効なトークンで
+ * 認証する（PIN 不要。表示用の名称変更でしかなく、端末コード・認証には
+ * 影響しないため）。
+ */
+function renameTerminal(params) {
+  var terminalCode = requireAuth_(params)
+  var terminalName = params && params.terminalName
+  if (typeof terminalName !== 'string' || terminalName.trim().length === 0) {
+    throw new ApiError('VALIDATION_ERROR', '端末名は必須です')
+  }
+
+  var lock = LockService.getScriptLock()
+  try {
+    lock.waitLock(LOCK_WAIT_MS)
+  } catch (err) {
+    throw new ApiError('LOCK_TIMEOUT', 'ロックを取得できませんでした。しばらくしてから再試行してください')
+  }
+
+  try {
+    var terminal = findTerminalRow_(terminalCode)
+    if (!terminal) {
+      throw new ApiError('VALIDATION_ERROR', '端末が見つかりません: ' + terminalCode)
+    }
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TERMINAL_SHEET_NAME)
+    sheet.getRange(terminal.rowIndex, 2).setValue(terminalName) // B列: 端末名
+
+    logOperation_(terminalCode, '端末名変更', '端末コード ' + terminalCode, { before: terminal.name, after: terminalName })
+
+    return { terminalCode: terminalCode, terminalName: terminalName }
+  } finally {
+    lock.releaseLock()
+  }
+}
+
+/**
  * PIN 検証と総当たり対策（design 6.7）。5回失敗で15分ロックする。
  * `rateLimitKey` は login では端末コード、registerTerminal では
  * 端末コードがまだ存在しないため固定のキーを使う。

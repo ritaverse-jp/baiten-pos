@@ -139,6 +139,7 @@ K 列の追加理由：再送や取消の突き合わせで「この会計の何
 | `registerTerminal` | POST | PIN | **あり** | 端末登録・端末コード発行・トークン発行 |
 | `login` | POST | PIN | なし | 既存端末の再認証。トークン再発行 |
 | `refreshToken` | POST | トークン | なし | 有効期限の巻き直し |
+| `renameTerminal` | POST | トークン | **あり** | 端末名の変更（タスク20で追加） |
 | `getMasters` | POST | トークン | なし | 商品・カテゴリ・自端末状態の一括取得 |
 | `getTodayMaxSeq` | POST | トークン | なし | 自端末・当日の最大連番取得（採番カウンタ復元用） |
 | `appendSales` | POST | トークン | **あり** | 売上明細の一括追記（冪等） |
@@ -212,6 +213,13 @@ K 列の追加理由：再送や取消の突き合わせで「この会計の何
 - 入力：`{ action, apiToken, terminalCode, date: "20260723" }`
 - 出力：`{ maxSeq: 14 }`
 - 処理：当月タブの C 列から `{date}-{terminalCode}` 前方一致の最大連番を返す。端末の IndexedDB が消えた際のカウンタ復元に使う（5.4）
+
+### 2.5.1 `renameTerminal`（タスク20で追加）
+
+- 入力：`{ action, apiToken, terminalCode, terminalName: "レジ2" }`
+- 出力：`{ terminalCode, terminalName }`
+- 処理：現行の有効なトークンで認証し（`requireAuth_`）、`端末` タブ B 列（端末名）だけを書き換える。表示用の名称変更でしかなく端末コード・認証には影響しないため、**PIN の再入力は不要**（`refreshToken` と同じ考え方）。他の書き込み系と揃えてロック内で行う
+- 設定画面（`screens/settings/SettingsScreen.tsx`）から、登録済み端末の端末名をいつでも変更できる
 
 ### 2.6 マスタ更新系
 
