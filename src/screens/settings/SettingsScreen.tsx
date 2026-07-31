@@ -40,6 +40,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
 
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [pendingSales, setPendingSales] = useState<PendingSale[]>([])
+  const [loading, setLoading] = useState(false)
 
   const [gasUrlInput, setGasUrlInput] = useState('')
   const [gasUrlError, setGasUrlError] = useState<string | null>(null)
@@ -56,10 +57,12 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [reLoginSubmitting, setReLoginSubmitting] = useState(false)
 
   const load = async () => {
+    setLoading(true)
     const [nextConfig, nextPending] = await Promise.all([getConfig(), getAllPendingSales()])
     setConfig(nextConfig)
     setGasUrlInput(nextConfig.gasUrl ?? '')
     setPendingSales(nextPending)
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -182,6 +185,12 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           {connection === 'online' ? 'オンライン' : 'オフライン'}
         </span>
       </header>
+
+      <div className={styles.toolbar}>
+        <button type="button" onClick={() => void load()} disabled={loading}>
+          再読み込み
+        </button>
+      </div>
 
       <div className={styles.body}>
         <section className={styles.section}>

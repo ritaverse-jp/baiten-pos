@@ -203,6 +203,20 @@ describe('登録済み・通常運転（blockedByなし）', () => {
 
     await waitFor(() => expect(fetch).toHaveBeenCalled())
   })
+
+  test('画面表示後に会計が確定された場合、「再読み込み」を押すと未送信一覧に反映される', async () => {
+    const user = userEvent.setup()
+    render(<SettingsScreen onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByText('未送信データ（0件）')).toBeInTheDocument())
+
+    // 画面を開いた後に、他の操作（会計確定）でキューに積まれた状況を模す
+    await enqueuePendingSale(pendingSale('20260730-A001'))
+    expect(screen.getByText('未送信データ（0件）')).toBeInTheDocument() // 自動では反映されない
+
+    await user.click(screen.getByRole('button', { name: '再読み込み' }))
+
+    await waitFor(() => expect(screen.getByText('未送信データ（1件）')).toBeInTheDocument())
+  })
 })
 
 describe('blockedBy: tokenExpired（design 6.6）', () => {
