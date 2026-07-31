@@ -8,8 +8,14 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#1f2937" />
+    <!-- mobile-web-app-capable が標準の名前。apple-mobile-web-app-capable は
+         iOS Safari 向けに残す（Chrome は前者を推奨し後者を非推奨扱いにしているが、
+         iOS はまだ後者しか見ないため両方必要。タスク13で見つけた警告への対処） -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>売店レジ</title>
   </head>
   <body>

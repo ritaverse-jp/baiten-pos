@@ -329,6 +329,15 @@ gas/                    Apps Script 側（clasp 管理）
 | `counters` | `YYYYMMDD` | 当日連番カウンタ |
 | `config` | 固定キー | 端末コード・端末名・apiToken・有効期限・GAS URL |
 
+### 3.4 フロントの配信【確定・タスク20】
+
+要件定義 5.2「フロントは独立した静的 PWA として配信する」の具体的な配信先として **GitHub Pages** を採用する。無料枠のみで運用できる静的ホスティングであり（1.2「月額のサーバー・DB費用を発生させない」と両立）、GitHub Actions（`.github/workflows/deploy.yml`）で `main` への push のたびに typecheck・test・lint を通してからビルド・デプロイする。
+
+- GitHub Pages は無料プランではパブリックリポジトリでのみ無料（プライベートリポジトリでの Pages は有料プランが必要）。このリポジトリは公開してよいことをユーザーに確認済み。PIN ハッシュ・トークン・スプレッドシートID等の秘匿情報はコードに含まれない（`.clasp.json` は gitignore 済み、秘密は GAS の Script Properties にのみ保持。CLAUDE.md「GAS 固有の注意」参照）ため、公開しても実害は無い
+- GitHub Pages はプロジェクトサイトをリポジトリ名のサブパス（`https://<user>.github.io/baiten-pos/`）で配信するため、`vite.config.ts` の `base` を CI ビルド時だけ `GITHUB_PAGES=true` 環境変数で切り替える。ローカルの `npm run dev`／`npm run preview` は従来どおりルート（`/`）のまま
+- **Service Worker は secure context（HTTPS または `localhost`）でしか登録できない。** 開発機の LAN IP（`http://192.168.x.x:port/`）はこの条件を満たさないため、スマホ実機での「ホーム画面に追加」→オフライン起動の確認には GitHub Pages 配信後の実 URL が必須（タスク20で判明）
+- Service Worker が manifest の `icons[].src` を base 起点に自動で書き換えないことが分かったため（`vite.config.ts` で手動対応）、`GITHUB_PAGES=true` でビルドした `dist/manifest.webmanifest` の中身を必ず確認してから配信すること
+
 ---
 
 ## 4. オフライン設計
