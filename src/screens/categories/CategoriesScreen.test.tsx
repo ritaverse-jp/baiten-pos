@@ -85,6 +85,30 @@ describe('カテゴリの追加・編集', () => {
     expect(screen.getByText('おもちゃ')).toBeInTheDocument()
   })
 
+  test('表示色はスウォッチをタップして選ぶ（hexの手入力ではない）', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockResolvedValueOnce(mastersResponse([], []))
+
+    render(<CategoriesScreen onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByTestId('connection-badge')).toHaveTextContent('オンライン'))
+
+    await user.click(screen.getByRole('button', { name: '+ カテゴリを追加' }))
+    const dialog = screen.getByRole('dialog', { name: 'カテゴリを追加' })
+    await user.type(within(dialog).getByLabelText('カテゴリ名'), 'おもちゃ')
+    await user.click(within(dialog).getByRole('button', { name: '青' }))
+
+    const newCategory: Category = { name: 'おもちゃ', displayOrder: null, color: '#1d4ed8' }
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ ok: true, data: { category: newCategory } }))
+    vi.mocked(fetch).mockResolvedValueOnce(mastersResponse([], [newCategory]))
+
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
+
+    await waitFor(() => {
+      const call = vi.mocked(fetch).mock.calls.find((c) => JSON.parse(String(c[1]?.body)).action === 'saveCategory')
+      expect(JSON.parse(String(call?.[1]?.body)).category.color).toBe('#1d4ed8')
+    })
+  })
+
   test('名前が重複していると保存前にエラーを表示し、通信しない（要件定義6.3）', async () => {
     const user = userEvent.setup()
     vi.mocked(fetch).mockResolvedValueOnce(mastersResponse([], [FOOD]))

@@ -87,7 +87,9 @@ describe('GAS URL未設定（初回セットアップの最初のステップ）
     await user.click(screen.getByRole('button', { name: '保存して接続確認' }))
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('接続を確認しました'))
-    expect(screen.getByLabelText('端末名')).toBeInTheDocument()
+    // ping結果の表示とconfigの再読み込み（load()）は別々のstate更新のため、
+    // 前者が見えた直後はまだ後者が反映されていないことがある（flakyだったため修正）
+    await waitFor(() => expect(screen.getByLabelText('端末名')).toBeInTheDocument())
   })
 
   test('pingが失敗してもエラーメッセージを表示しつつ端末登録欄には進める', async () => {
@@ -100,7 +102,7 @@ describe('GAS URL未設定（初回セットアップの最初のステップ）
     await user.click(screen.getByRole('button', { name: '保存して接続確認' }))
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('GAS へ通信できませんでした'))
-    expect(screen.getByLabelText('端末名')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('端末名')).toBeInTheDocument())
   })
 })
 

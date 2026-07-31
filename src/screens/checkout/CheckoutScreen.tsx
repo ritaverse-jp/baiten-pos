@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { confirmSale, CONFIRM_SALE_ERROR_MESSAGES } from '@/data/sync/checkout'
 import { runSync } from '@/data/sync/engine'
+import { resolveCategoryPalette } from '@/domain/categoryColor'
 import { ticketErrorMessage } from '@/domain/ticket'
 import type { Yen } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
@@ -113,6 +114,7 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
   }
 
   const visibleProducts = products.filter((p) => p.categoryName === selectedCategory)
+  const categoryPalette = resolveCategoryPalette(categories, selectedCategory)
   // NF-04：起動時の復元が終わるまで、空の伝票・空の商品一覧を一瞬見せない。
   // ヘッダーだけは常に表示し、読み込み中に画面が真っ白になるのを避ける。
   const hydrated = ticketHydrated && masterHydrated
@@ -143,7 +145,7 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
           </div>
 
           <div className={styles.productsArea}>
-            <ProductGrid products={visibleProducts} onAdd={handleAddProduct} />
+            <ProductGrid products={visibleProducts} onAdd={handleAddProduct} palette={categoryPalette} />
           </div>
 
           <div className={styles.numpadArea}>

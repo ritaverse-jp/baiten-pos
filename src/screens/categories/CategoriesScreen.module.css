@@ -159,7 +159,8 @@
   gap: 0.25rem;
 }
 
-.formField label {
+.formField label,
+.formField > span:first-child {
   font-size: 0.875rem;
   color: #374151;
 }
@@ -169,6 +170,33 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 1rem;
+}
+
+.colorSwatchPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* 要件定義7.3：タップ領域44×44pt以上 */
+.colorSwatchButton {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.colorSwatchNone {
+  background: #ffffff;
+  border-color: #d1d5db;
+  color: #374151;
+  font-size: 0.6875rem;
+}
+
+.colorSwatchSelected {
+  border-color: #111827;
+  box-shadow: 0 0 0 2px #ffffff inset;
 }
 
 .errorText {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PALETTE_SWATCHES } from '@/domain/categoryColor'
 import { CATEGORY_FORM_ERROR_MESSAGES, validateCategoryForm } from '@/domain/masters'
 import type { Category } from '@/domain/types'
 import styles from './CategoriesScreen.module.css'
@@ -77,8 +78,31 @@ export default function CategoryForm({ category, categories, submitting, submitE
         </div>
 
         <div className={styles.formField}>
-          <label htmlFor="category-color">表示色（任意）</label>
-          <input id="category-color" type="text" placeholder="#RRGGBB" value={color} onChange={(e) => setColor(e.target.value)} />
+          <span id="category-color-label">
+            表示色（任意。会計画面のカテゴリ色・商品タイル色に使う。未指定なら自動で色を割り当てる）
+          </span>
+          <div className={styles.colorSwatchPicker} role="group" aria-labelledby="category-color-label">
+            <button
+              type="button"
+              className={`${styles.colorSwatchButton} ${styles.colorSwatchNone} ${color === '' ? styles.colorSwatchSelected : ''}`}
+              aria-label="自動（色を指定しない）"
+              aria-pressed={color === ''}
+              onClick={() => setColor('')}
+            >
+              自動
+            </button>
+            {PALETTE_SWATCHES.map((swatch) => (
+              <button
+                key={swatch.color}
+                type="button"
+                className={`${styles.colorSwatchButton} ${color === swatch.color ? styles.colorSwatchSelected : ''}`}
+                style={{ backgroundColor: swatch.color }}
+                aria-label={swatch.name}
+                aria-pressed={color === swatch.color}
+                onClick={() => setColor(swatch.color)}
+              />
+            ))}
+          </div>
         </div>
 
         {errorMessage && (
