@@ -4,6 +4,10 @@
 
 データストアは Google スプレッドシート、バックエンドは Google Apps Script、フロントは Vite + React + TypeScript の PWA。専用の DB・サーバーは持たない。
 
+## 配信
+
+https://ritaverse-jp.github.io/baiten-pos/ （GitHub Pages。`main` への push で GitHub Actions が自動デプロイする。`.github/workflows/deploy.yml`）
+
 ## 文書
 
 | ファイル | 内容 |
