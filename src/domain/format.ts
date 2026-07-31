@@ -34,3 +34,8 @@ export function formatYen(amount: Yen): string {
 export function formatTime(iso: IsoDateTime): string {
   return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
 }
+
+/** `IsoDateTime` を `YYYY/MM/DD`（JST）で表示する（SC-06 設定画面：トークン有効期限の表示） */
+export function formatDate(iso: IsoDateTime): string {
+  return new Date(iso).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' })
+}

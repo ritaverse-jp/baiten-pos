@@ -27,11 +27,13 @@ const HIGHLIGHT_DURATION_MS = 600
 interface CheckoutScreenProps {
   /** SC-03 商品マスタ管理への遷移（タスク17） */
   onNavigateToProducts: () => void
-  /** SC-05 会計履歴への遷移（タスク18）。設定はタスク19まで未実装のため無効ボタンのまま残す */
+  /** SC-05 会計履歴への遷移（タスク18） */
   onNavigateToHistory: () => void
+  /** SC-06 設定・初回セットアップへの遷移（タスク19） */
+  onNavigateToSettings: () => void
 }
 
-export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHistory }: CheckoutScreenProps) {
+export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHistory, onNavigateToSettings }: CheckoutScreenProps) {
   const ticketHydrated = useTicketStore((s) => s.hydrated)
   const lines = useTicketStore((s) => s.lines)
   const note = useTicketStore((s) => s.note)
@@ -120,14 +122,13 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>売店レジ</h1>
         <nav className={styles.headerNav} aria-label="画面切り替え">
-          {/* 設定への遷移はタスク19で実装する */}
           <button type="button" onClick={onNavigateToHistory}>
             履歴
           </button>
           <button type="button" onClick={onNavigateToProducts}>
             商品管理
           </button>
-          <button type="button" disabled>
+          <button type="button" onClick={onNavigateToSettings}>
             設定
           </button>
         </nav>

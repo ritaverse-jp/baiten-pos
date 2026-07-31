@@ -72,7 +72,7 @@ afterEach(() => {
 describe('起動時の復元とちらつき対策（NF-04）', () => {
   test('ヘッダーは復元前から表示され、本文は復元完了まで「読み込み中」のままになる', () => {
     // hydrated: false のまま（beforeEach の初期状態）でマウント
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     expect(screen.getByRole('heading', { name: '売店レジ' })).toBeInTheDocument()
     expect(screen.getByText('読み込み中…')).toBeInTheDocument()
@@ -90,7 +90,7 @@ describe('起動時の復元とちらつき対策（NF-04）', () => {
     seedMasters([KARAAGE], [FOOD])
     useMasterStore.setState({ hydrated: false }) // マスタも未復元から始める
 
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     // 復元完了前は「読み込み中」で、伝票の中身（からあげ串）はまだ見えない
     expect(screen.getByText('読み込み中…')).toBeInTheDocument()
@@ -107,12 +107,18 @@ describe('起動時の復元とちらつき対策（NF-04）', () => {
   })
 })
 
-describe('画面遷移（タスク17・18）', () => {
+describe('画面遷移（タスク17・18・19）', () => {
   test('「商品管理」を押すとonNavigateToProductsが呼ばれる', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
     const onNavigateToProducts = vi.fn()
-    render(<CheckoutScreen onNavigateToProducts={onNavigateToProducts} onNavigateToHistory={() => {}} />)
+    render(
+      <CheckoutScreen
+        onNavigateToProducts={onNavigateToProducts}
+        onNavigateToHistory={() => {}}
+        onNavigateToSettings={() => {}}
+      />,
+    )
 
     await user.click(screen.getByRole('button', { name: '商品管理' }))
 
@@ -123,11 +129,34 @@ describe('画面遷移（タスク17・18）', () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
     const onNavigateToHistory = vi.fn()
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={onNavigateToHistory} />)
+    render(
+      <CheckoutScreen
+        onNavigateToProducts={() => {}}
+        onNavigateToHistory={onNavigateToHistory}
+        onNavigateToSettings={() => {}}
+      />,
+    )
 
     await user.click(screen.getByRole('button', { name: '履歴' }))
 
     expect(onNavigateToHistory).toHaveBeenCalledOnce()
+  })
+
+  test('「設定」を押すとonNavigateToSettingsが呼ばれる', async () => {
+    const user = userEvent.setup()
+    seedMasters([KARAAGE], [FOOD])
+    const onNavigateToSettings = vi.fn()
+    render(
+      <CheckoutScreen
+        onNavigateToProducts={() => {}}
+        onNavigateToHistory={() => {}}
+        onNavigateToSettings={onNavigateToSettings}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '設定' }))
+
+    expect(onNavigateToSettings).toHaveBeenCalledOnce()
   })
 })
 
@@ -135,7 +164,7 @@ describe('FR-03: No.入力による商品追加', () => {
   test('No.を入力して「追加」を押すと伝票に追加される', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: '1' }))
     await user.click(screen.getByRole('button', { name: '追加' }))
@@ -149,7 +178,7 @@ describe('FR-03: No.入力による商品追加', () => {
   test('存在しないNo.を入力するとエラーメッセージが表示され、伝票は変更されない', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: '9' }))
     await user.click(screen.getByRole('button', { name: '9' }))
@@ -164,7 +193,7 @@ describe('FR-03: No.入力による商品追加', () => {
   test('同一No.を続けて追加すると個数が増える（新規行は増えない。要件定義6.4）', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: '1' }))
     await user.click(screen.getByRole('button', { name: '追加' }))
@@ -182,7 +211,7 @@ describe('FR-03: No.入力による商品追加', () => {
   test('「取消」はテンキーの入力中の数字だけを消し、伝票には影響しない', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: '1' }))
     expect(screen.getByText('No. 1')).toBeInTheDocument()
@@ -198,7 +227,7 @@ describe('FR-04: 商品一覧タップによる追加', () => {
   test('商品ボタンをタップすると1タップで伝票に追加される', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
 
@@ -210,7 +239,7 @@ describe('FR-04: 商品一覧タップによる追加', () => {
   test('カテゴリを切り替えると該当カテゴリの商品のみ表示される（要件定義6.3）', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE, RAMUNE], [FOOD, DRINK])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     // 既定では表示順が最初のカテゴリ（フード）が選択される
     expect(screen.getByRole('button', { name: 'からあげ串を追加' })).toBeInTheDocument()
@@ -224,7 +253,7 @@ describe('FR-04: 商品一覧タップによる追加', () => {
 
   test('販売状態が無効の商品は一覧に表示されない（要件定義6.2）', () => {
     seedMasters([KARAAGE, DISCONTINUED], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     expect(screen.getByRole('button', { name: 'からあげ串を追加' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '販売終了品を追加' })).not.toBeInTheDocument()
@@ -234,7 +263,7 @@ describe('FR-04: 商品一覧タップによる追加', () => {
 describe('FR-05: 個数変更', () => {
   async function addKaraage(user: ReturnType<typeof userEvent.setup>) {
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
   }
@@ -288,7 +317,7 @@ describe('FR-06: 商品行の削除', () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
 
@@ -303,7 +332,7 @@ describe('FR-07: 円割引', () => {
   test('割引額を入力すると行に反映され、小計が(単価-割引)×個数になる', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' })) // qty: 2
     await waitFor(() => expect(useTicketStore.getState().lines[0].qty).toBe(2))
@@ -322,7 +351,7 @@ describe('FR-07: 円割引', () => {
   test('単価を超える割引はエラーを表示し、反映されない', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
 
@@ -342,7 +371,7 @@ describe('FR-08: 合計金額算出', () => {
   test('複数行の合計が正しく表示される', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE, RAMUNE], [FOOD, DRINK])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' })) // 500円
     await user.click(screen.getByRole('tab', { name: 'ドリンク' }))
@@ -356,7 +385,7 @@ describe('FR-08: 合計金額算出', () => {
 
   test('伝票が空のときの合計は0円', () => {
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     expect(screen.getByTestId('ticket-total')).toHaveTextContent('0円')
   })
 })
@@ -366,7 +395,7 @@ describe('伝票クリア（FR-12・7.3の確認ダイアログ）', () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
 
@@ -378,7 +407,7 @@ describe('伝票クリア（FR-12・7.3の確認ダイアログ）', () => {
 
   test('伝票が空のときはクリアボタンが非活性', () => {
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     expect(screen.getByRole('button', { name: '伝票クリア' })).toBeDisabled()
   })
 })
@@ -386,14 +415,14 @@ describe('伝票クリア（FR-12・7.3の確認ダイアログ）', () => {
 describe('精算へボタン', () => {
   test('伝票が空のときは非活性', () => {
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     expect(screen.getByRole('button', { name: '精算へ' })).toBeDisabled()
   })
 
   test('商品を追加すると活性になる', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
 
@@ -405,7 +434,7 @@ describe('精算へボタン', () => {
   test('タップすると精算モーダル（SC-02）が開く', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '精算へ' })).toBeEnabled())
 
@@ -418,7 +447,7 @@ describe('精算へボタン', () => {
   test('精算モーダルを閉じると会計画面に戻る', async () => {
     const user = userEvent.setup()
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '精算へ' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: '精算へ' }))
@@ -434,7 +463,7 @@ describe('商品追加時のフィードバック（要件定義7.3）', () => {
     const user = userEvent.setup()
     Object.defineProperty(navigator, 'vibrate', { value: vi.fn(), configurable: true })
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
 
@@ -447,7 +476,7 @@ describe('商品追加時のフィードバック（要件定義7.3）', () => {
     const user = userEvent.setup()
     Object.defineProperty(navigator, 'vibrate', { value: undefined, configurable: true })
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await expect(user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))).resolves.not.toThrow()
   })
@@ -459,7 +488,7 @@ describe('会計確定フロー（FR-11・design 4.1・不変条件9）', () => 
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     await saveConfig({ terminalCode: toTerminalCode('A') })
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     // FR-04：商品タップで追加
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
@@ -500,7 +529,7 @@ describe('会計確定フロー（FR-11・design 4.1・不変条件9）', () => 
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     // config.terminalCode を設定しない
     seedMasters([KARAAGE], [FOOD])
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
@@ -537,7 +566,7 @@ describe('会計確定時の自動同期（design 4.1「会計確定時」トリ
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} />)
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'からあげ串を追加' }))
     await waitFor(() => expect(useTicketStore.getState().lines).toHaveLength(1))
     await user.click(screen.getByRole('button', { name: '精算へ' }))

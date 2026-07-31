@@ -3,14 +3,16 @@ import CategoriesScreen from '@/screens/categories/CategoriesScreen'
 import CheckoutScreen from '@/screens/checkout/CheckoutScreen'
 import HistoryScreen from '@/screens/history/HistoryScreen'
 import ProductsScreen from '@/screens/products/ProductsScreen'
+import SettingsScreen from '@/screens/settings/SettingsScreen'
 import { reconcileCounterOnStartup } from '@/data/sync/counter'
 import { startSyncEngine } from '@/data/sync/engine'
+import { startTokenRefreshWatcher } from '@/data/sync/tokenRefresh'
 import { useMasterStore } from '@/state/masterStore'
 import { useSyncStore } from '@/state/syncStore'
 import { useTicketStore } from '@/state/ticketStore'
 
 /** 画面遷移。ルーティングライブラリを使うほどの規模ではないため単純な状態切り替えにする */
-type View = 'checkout' | 'products' | 'categories' | 'history'
+type View = 'checkout' | 'products' | 'categories' | 'history' | 'settings'
 
 export default function App() {
   const [view, setView] = useState<View>('checkout')
@@ -36,6 +38,9 @@ export default function App() {
 
     // design 4.1 の起動契機（online復帰・タブ復帰・30秒間隔）を配線する
     startSyncEngine()
+
+    // design 6.5：残り14日を切ったらオンライン時に静かにトークンを巻き直す
+    startTokenRefreshWatcher()
   }, [hydrateTicket, hydrateMasters, hydrateSync])
 
   if (view === 'products') {
@@ -47,5 +52,14 @@ export default function App() {
   if (view === 'history') {
     return <HistoryScreen onBack={() => setView('checkout')} />
   }
-  return <CheckoutScreen onNavigateToProducts={() => setView('products')} onNavigateToHistory={() => setView('history')} />
+  if (view === 'settings') {
+    return <SettingsScreen onBack={() => setView('checkout')} />
+  }
+  return (
+    <CheckoutScreen
+      onNavigateToProducts={() => setView('products')}
+      onNavigateToHistory={() => setView('history')}
+      onNavigateToSettings={() => setView('settings')}
+    />
+  )
 }

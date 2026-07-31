@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { formatProductNo, formatTime, formatYen } from './format'
+import { formatDate, formatProductNo, formatTime, formatYen } from './format'
 import { toYen, type IsoDateTime } from './types'
 
 describe('formatProductNo', () => {
@@ -43,5 +43,16 @@ describe('formatTime', () => {
   test('UTC・Z表記（ローカルのSaleRecord.confirmedAt由来）もJSTに変換して表示する', () => {
     // 2026-07-30T05:32:00Z は JST で 14:32
     expect(formatTime('2026-07-30T05:32:00.000Z' as IsoDateTime)).toBe('14:32')
+  })
+})
+
+describe('formatDate', () => {
+  test('YYYY/MM/DD（JST）で表示する', () => {
+    expect(formatDate('2026-10-28T00:00:00+09:00' as IsoDateTime)).toBe('2026/10/28')
+  })
+
+  test('UTC表記の日付境界もJSTに変換してから表示する', () => {
+    // 2026-10-27T15:30:00Z は JST で 2026-10-28 00:30
+    expect(formatDate('2026-10-27T15:30:00.000Z' as IsoDateTime)).toBe('2026/10/28')
   })
 })
