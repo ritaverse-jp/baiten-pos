@@ -167,6 +167,25 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     await load()
   }
 
+  /**
+   * 端末登録のやり直し（リセット）。ローカルの端末登録情報だけを消去し、
+   * GAS URL は残す。`config.terminalCode`/`apiToken` が無くなることで
+   * `step` が自動的に `'register'` に戻り、登録ウィザードを最初からやり直せる。
+   *
+   * トークンが端末タブの行と食い違って `TERMINAL_DISABLED` から抜け出せなく
+   * なった場合の復旧手段としても使う（登録済みのつもりが実際には端末タブに
+   * 行が無い状態になっていたケースがあったため用意した）。GAS 側のトークン
+   * 実体・端末タブの行はそのまま残るため、後片付けが必要な場合は別途行うこと。
+   */
+  const handleResetRegistration = async () => {
+    if (!window.confirm('この端末の登録情報を消去し、登録をやり直します。よろしいですか？')) return
+    await saveConfig({ terminalCode: null, terminalName: null, apiToken: null, tokenExpiresAt: null })
+    useSyncStore.getState().setBlockedBy(null)
+    setRegisterPin('')
+    setRegisterError(null)
+    await load()
+  }
+
   const handleForceSync = async () => {
     await runSync({ force: true })
     await load()
@@ -315,6 +334,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 disabled={renaming || renameInput === config.terminalName}
               >
                 {renaming ? '変更中…' : '端末名を変更'}
+              </button>
+              <button type="button" onClick={() => void handleResetRegistration()}>
+                登録をやり直す（リセット）
               </button>
             </section>
 

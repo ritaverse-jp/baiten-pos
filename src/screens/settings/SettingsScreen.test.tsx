@@ -205,6 +205,31 @@ describe('登録済み・通常運転（blockedByなし）', () => {
     expect(screen.getByRole('button', { name: '端末名を変更' })).toBeDisabled()
   })
 
+  test('「登録をやり直す」で確認後、端末登録情報を消去し登録ウィザードに戻る', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    useSyncStore.setState({ blockedBy: 'terminalDisabled' })
+    render(<SettingsScreen onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByLabelText('端末名')).toHaveValue('レジ1'))
+
+    await user.click(screen.getByRole('button', { name: '登録をやり直す（リセット）' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'この端末を登録' })).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: '端末名を変更' })).not.toBeInTheDocument() // 端末情報セクションは消える
+    expect(useSyncStore.getState().blockedBy).toBeNull()
+  })
+
+  test('「登録をやり直す」で確認をキャンセルすると何も変わらない', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<SettingsScreen onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByLabelText('端末名')).toHaveValue('レジ1'))
+
+    await user.click(screen.getByRole('button', { name: '登録をやり直す（リセット）' }))
+
+    expect(screen.getByLabelText('端末名')).toHaveValue('レジ1')
+  })
+
   test('未送信が無ければ「今すぐ同期」は非活性', async () => {
     render(<SettingsScreen onBack={() => {}} />)
     await waitFor(() => expect(screen.getByText('未送信データ（0件）')).toBeInTheDocument())
