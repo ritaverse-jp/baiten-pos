@@ -28,6 +28,23 @@ var PRODUCT_IMAGE_MAX_BASE64_LENGTH = Math.ceil((PRODUCT_IMAGE_MAX_BYTES / 3) * 
 var PRODUCT_IMAGE_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 /**
+ * 画像フォルダを用意し、IDを実行ログに出す。**Apps Script エディタから
+ * 手動で実行するための入口。**
+ *
+ * この機能で `DriveApp` を使うようになったため OAuth スコープが増えており、
+ * Web アプリからの初回呼び出しが認可エラーになることがある。エディタで
+ * この関数を1度実行して承認しておけば解消する（`_` で終わる関数はエディタの
+ * 実行対象に出てこないため、承認用に公開名の関数を用意している）。
+ *
+ * 冪等。既にフォルダがあれば作らずそのIDを返す。
+ */
+function setupProductImageFolder() {
+  var folder = productImageFolder_()
+  Logger.log('商品画像フォルダ: ' + folder.getName() + ' / ID: ' + folder.getId())
+  return folder.getId()
+}
+
+/**
  * 商品写真の保存（差し替えを含む）。ロック内で
  * 「対象行を特定 → Drive に保存 → G列を更新 → 旧ファイルを破棄 → 操作ログ」を行う。
  */
