@@ -4,10 +4,12 @@
  * レイアウトの切り替えは「画面の幅」ではなく「画面の向き」で行う
  * （要件定義 5.1「画面向き：縦・横の両方に対応（タブレットは横向きを推奨）」）。
  *
- *   縦向き（既定）                       → 縦積み。上部に伝票、下部に商品選択／テンキー
+ *   縦向き（既定）                       → 縦積み。上部に伝票、下部に商品選択
  *   横向き                               → 左右2カラム。左=商品操作／右=伝票
- *   横向きかつ低背（--> スマホ横向き）    → 2カラムのままテンキーを収納式にする
+ *   横向きかつ低背（--> スマホ横向き）    → 2カラムのまま各要素を詰める
  *   min-width: 900px                     → タブレット相当として各要素を拡大（レイアウトは変えない）
+ *
+ * テンキーはどのモードでも収納式（初期状態は閉じる）。下の .numpadToggle を参照。
  *
  * かつては min-width: 900px だけで縦積み↔2カラムを切り替えていたが、幅だけで
  * 判定するとスマホ横向き（852×393 等）が幅900px未満のため縦積みに落ち、高さ
@@ -39,8 +41,14 @@
   --font-total: 2.5rem; /* 要件定義 7.3：合計・釣銭は 40pt 以上 */
   --font-title: 1.25rem;
   --pad: 0.75rem;
-  /* 縦積み時に伝票が伸び続けて商品グリッドを潰さないための上限 */
-  --ticket-max: 42%;
+  /*
+   * 縦積み時の伝票エリアの高さ。内容に応じて伸びる指定（auto や
+   * minmax(min-content, 42%)）にすると、商品を追加するたびに伝票が伸びて
+   * 商品グリッドが少しずつ狭くなり、タップ先が動いて操作しづらい。
+   * 行数によらず固定の割合にして、商品グリッドの大きさを一定に保つ。
+   * 伝票が入りきらない分は .ticketLines 側がスクロールする。
+   */
+  --ticket-h: 38%;
 
   /* --safe-l / --safe-r / --safe-b（セーフエリア）は index.css の :root で
      定義したものを継承して使う。この画面では2カラム時に、画面の縁に接しなく
@@ -55,13 +63,7 @@
     'categoriesArea'
     'productsArea'
     'numpadArea';
-  /*
-   * 伝票行は minmax(min-content, --ticket-max)。行数が少ないうちは内容の高さに
-   * とどまり、増えても画面の 42% で頭打ちになって .ticketLines 側がスクロールする。
-   * 以前は auto だったため、商品を数点入れただけで伝票が画面を占拠し、商品
-   * グリッド（1fr）が潰れていた。
-   */
-  grid-template-rows: auto minmax(min-content, var(--ticket-max)) auto minmax(0, 1fr) auto;
+  grid-template-rows: auto var(--ticket-h) auto minmax(0, 1fr) auto;
   background: #f3f4f6;
 }
 
@@ -99,9 +101,8 @@
 }
 
 /*
- * スマホ横向き。高さが 390px 前後しかないため、常時表示のテンキーを置くと
- * 商品グリッドが 1〜2行しか見えなくなる。テンキーはトグルで開く
- * オーバーレイに切り替え、その分の高さを商品グリッドに回す。
+ * スマホ横向き。高さが 390px 前後しかないため、タイル・余白を詰めて
+ * 商品グリッドに回せる高さを稼ぐ。
  */
 @media (orientation: landscape) and (max-height: 560px) {
   .screen {
@@ -270,16 +271,15 @@
 }
 
 /*
- * 収納式テンキーの開閉ボタン。既定（縦向き・タブレット横向き）ではテンキーを
- * 常時表示するため出さない。
+ * テンキーは全モード共通で「必要なときだけ開く」収納式にし、初期状態は閉じる。
+ * 商品タイルのタップだけで会計できる運用が主で、No. 直接入力を使わない担当者に
+ * とっては常時表示のテンキーが場所を取るだけになるため（ユーザー要望）。
  *
- * トグルもテンキー本体も常に DOM に置き、表示の切り替えは CSS だけで行う。
- * 条件レンダリングにすると画面の向きによって要素の有無が変わり、jsdom では
- * メディアクエリが効かないため CheckoutScreen.test.tsx から見える DOM と
- * 実機の DOM が食い違ってしまう。
+ * 開いたテンキーはグリッドの行を広げず、商品グリッドの上に重ねて表示する。
+ * 行を広げる形にすると開閉のたびに商品タイルの位置が動いてしまう。
  */
 .numpadToggle {
-  display: none;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   width: 100%;
@@ -289,34 +289,30 @@
 }
 
 .numpadPanel {
+  display: none;
+  position: absolute;
+  bottom: 100%; /* トグルの上（商品グリッドに重ねる形）に開く */
+  left: calc(0.5rem + var(--safe-l));
+  z-index: 5;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 0.5rem;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/*
+ * 開閉は data 属性で切り替える。トグルもテンキー本体も常に DOM に置き、
+ * 条件レンダリングはしない（jsdom ではメディアクエリが効かないため、
+ * DOM の有無を CSS 以外で変えると CheckoutScreen.test.tsx から見える DOM と
+ * 実機の DOM が食い違う）。
+ */
+.numpadPanel[data-open='true'] {
   display: block;
 }
 
 .numpad {
   max-width: 320px;
-}
-
-@media (orientation: landscape) and (max-height: 560px) {
-  .numpadToggle {
-    display: inline-flex;
-  }
-
-  .numpadPanel {
-    display: none;
-    position: absolute;
-    bottom: 100%; /* トグルの上（商品グリッドに重ねる形）に開く */
-    left: calc(0.5rem + var(--safe-l));
-    z-index: 5;
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 12px;
-    padding: 0.5rem;
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
-  }
-
-  .numpadPanel[data-open='true'] {
-    display: block;
-  }
 }
 
 .numpadDisplay {

@@ -49,9 +49,9 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
   const [numpadError, setNumpadError] = useState<string | null>(null)
   const [highlightedLineId, setHighlightedLineId] = useState<string | null>(null)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
-  // スマホ横向き（高さが低い横画面）でだけ使う収納式テンキーの開閉状態。
-  // 他のモードではテンキーが常時表示のため、この値は参照されない
-  // （表示の出し分けは CheckoutScreen.module.css のメディアクエリが行う）
+  // 収納式テンキーの開閉状態。全モード共通で、初期状態は閉じる。
+  // 商品タイルのタップだけで会計する運用が主で、No. 直接入力を使わない
+  // 担当者にはテンキーが場所を取るだけになるため（ユーザー要望）
   const [numpadOpen, setNumpadOpen] = useState(false)
 
   // カテゴリが読み込まれたら、表示順が最初のものを既定選択にする
@@ -93,8 +93,7 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
     if (!numpadValue) return
     void handleAddProduct(Number(numpadValue)).then(() => {
       setNumpadValue('')
-      // 収納式テンキー（スマホ横向き）は追加できたら閉じて商品グリッドに戻す。
-      // 常時表示のモードでは .numpadPanel の display を CSS が固定しているため影響しない
+      // 追加できたらテンキーを閉じ、商品グリッドが見える状態に戻す
       setNumpadOpen(false)
     })
   }
@@ -159,10 +158,9 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
 
           <div className={styles.numpadArea}>
             {/*
-              トグルとテンキー本体は常に DOM に置き、表示の出し分けは CSS の
-              メディアクエリに任せる（条件レンダリングにすると jsdom では
-              メディアクエリが効かず、テストから見える DOM と実機が食い違う）。
-              トグルが実際に見えるのはスマホ横向き相当のときだけ。
+              テンキー本体は常に DOM に置き、開閉は data-open 属性で CSS に
+              伝える（条件レンダリングにすると jsdom ではメディアクエリが
+              効かず、テストから見える DOM と実機が食い違う）。
             */}
             <button
               type="button"
@@ -171,7 +169,7 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
               aria-controls="numpad-panel"
               onClick={() => setNumpadOpen((open) => !open)}
             >
-              No. 入力{numpadValue && `（${numpadValue}）`}
+              {numpadOpen ? 'テンキーを閉じる' : `No. 入力${numpadValue ? `（${numpadValue}）` : ''}`}
             </button>
             <div id="numpad-panel" className={styles.numpadPanel} data-open={numpadOpen ? 'true' : 'false'}>
               <Numpad value={numpadValue} onChange={setNumpadValue} onSubmit={handleNumpadSubmit} error={numpadError} />

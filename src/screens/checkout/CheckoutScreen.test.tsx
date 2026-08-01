@@ -160,6 +160,51 @@ describe('画面遷移（タスク17・18・19）', () => {
   })
 })
 
+describe('収納式テンキー（タスク20・ユーザー要望）', () => {
+  /*
+   * テンキーの表示・非表示そのものは CSS（.numpadPanel の display）が担当し、
+   * jsdom では CSS が適用されないため「見えるかどうか」は検証できない。
+   * ここでは CSS に開閉を伝える data-open 属性と aria-expanded を検証する。
+   */
+  test('初期状態では閉じている', () => {
+    seedMasters([KARAAGE], [FOOD])
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
+
+    const toggle = screen.getByRole('button', { name: /^No\. 入力/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(document.getElementById('numpad-panel')).toHaveAttribute('data-open', 'false')
+  })
+
+  test('トグルを押すと開き、もう一度押すと閉じる', async () => {
+    const user = userEvent.setup()
+    seedMasters([KARAAGE], [FOOD])
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
+
+    await user.click(screen.getByRole('button', { name: /^No\. 入力/ }))
+    expect(document.getElementById('numpad-panel')).toHaveAttribute('data-open', 'true')
+
+    const closeToggle = screen.getByRole('button', { name: 'テンキーを閉じる' })
+    expect(closeToggle).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(closeToggle)
+    expect(document.getElementById('numpad-panel')).toHaveAttribute('data-open', 'false')
+  })
+
+  test('商品を追加できたら自動的に閉じる', async () => {
+    const user = userEvent.setup()
+    seedMasters([KARAAGE], [FOOD])
+    render(<CheckoutScreen onNavigateToProducts={() => {}} onNavigateToHistory={() => {}} onNavigateToSettings={() => {}} />)
+
+    await user.click(screen.getByRole('button', { name: /^No\. 入力/ }))
+    await user.click(screen.getByRole('button', { name: '1' }))
+    await user.click(screen.getByRole('button', { name: '追加' }))
+
+    await waitFor(() => {
+      expect(document.getElementById('numpad-panel')).toHaveAttribute('data-open', 'false')
+    })
+  })
+})
+
 describe('FR-03: No.入力による商品追加', () => {
   test('No.を入力して「追加」を押すと伝票に追加される', async () => {
     const user = userEvent.setup()
