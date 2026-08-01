@@ -1,11 +1,27 @@
 /*
  * SC-01 会計画面のレイアウト（要件定義 7.2）。
- * 既定（縦画面・スマートフォン）は「上部に伝票、下部に商品選択／テンキー」の
- * 縦積みで、900px 以上（タブレット横向き相当）で左右2カラムに切り替える。
+ *
+ * レイアウトの切り替えは「画面の幅」ではなく「画面の向き」で行う
+ * （要件定義 5.1「画面向き：縦・横の両方に対応（タブレットは横向きを推奨）」）。
+ *
+ *   縦向き（既定）                       → 縦積み。上部に伝票、下部に商品選択／テンキー
+ *   横向き                               → 左右2カラム。左=商品操作／右=伝票
+ *   横向きかつ低背（--> スマホ横向き）    → 2カラムのままテンキーを収納式にする
+ *   min-width: 900px                     → タブレット相当として各要素を拡大（レイアウトは変えない）
+ *
+ * かつては min-width: 900px だけで縦積み↔2カラムを切り替えていたが、幅だけで
+ * 判定するとスマホ横向き（852×393 等）が幅900px未満のため縦積みに落ち、高さ
+ * 393px の中にヘッダー・伝票・カテゴリ・商品・テンキーを5段積む形になって破綻
+ * していた。向きで判定することで、スマホ・タブレットのどちらでも「縦＝縦積み／
+ * 横＝2カラム」で挙動が揃う。
+ *
+ * 寸法は .screen のカスタムプロパティに集約し、モードごとに上書きする。
+ * 各トークンの下限は要件定義 7.3 の最小値（金額 24px・合計/釣銭 40px）と一致
+ * させてあるため、どのモードでもこれを下回らない。タップ領域 44×44pt 以上は
+ * index.css のグローバル button スタイルで担保済みのため個別に指定しない。
  *
  * 色は背景・文字とも 4.5:1 以上のコントラストを確保する組み合わせを使う
- * （要件定義 7.3）。ボタンのタップ領域 44×44pt 以上は index.css のグローバル
- * button スタイルで担保済みのため、ここでは個別に指定しない。
+ * （要件定義 7.3）。
  */
 
 .loading {
@@ -17,6 +33,24 @@
 }
 
 .screen {
+  /* --- サイズトークン（モードごとに上書きする） --- */
+  --tile-min: 120px; /* 商品タイルの最小幅。auto-fill の列数がこれで決まる */
+  --font-amount: 1.5rem; /* 要件定義 7.3：金額表示は最低 24pt */
+  --font-total: 2.5rem; /* 要件定義 7.3：合計・釣銭は 40pt 以上 */
+  --font-title: 1.25rem;
+  --pad: 0.75rem;
+  /* 縦積み時に伝票が伸び続けて商品グリッドを潰さないための上限 */
+  --ticket-max: 42%;
+
+  /*
+   * index.html の viewport-fit=cover により、ノッチ／ホームインジケータの下にも
+   * 描画される。横向きの iPhone では左右どちらかにノッチが来るため、画面の縁に
+   * 接する要素はこのインセット分だけ内側に寄せる。
+   */
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
   display: grid;
   height: 100%;
   min-height: 0;
@@ -26,11 +60,17 @@
     'categoriesArea'
     'productsArea'
     'numpadArea';
-  grid-template-rows: auto auto auto 1fr auto;
+  /*
+   * 伝票行は minmax(min-content, --ticket-max)。行数が少ないうちは内容の高さに
+   * とどまり、増えても画面の 42% で頭打ちになって .ticketLines 側がスクロールする。
+   * 以前は auto だったため、商品を数点入れただけで伝票が画面を占拠し、商品
+   * グリッド（1fr）が潰れていた。
+   */
+  grid-template-rows: auto minmax(min-content, var(--ticket-max)) auto minmax(0, 1fr) auto;
   background: #f3f4f6;
 }
 
-@media (min-width: 900px) {
+@media (orientation: landscape) {
   .screen {
     grid-template-areas:
       'header header'
@@ -38,7 +78,40 @@
       'productsArea ticketArea'
       'numpadArea ticketArea';
     grid-template-columns: 3fr 2fr;
-    grid-template-rows: auto auto 1fr auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  /* 2カラム時、左カラムの右端・伝票カラムの左端は画面の縁ではないため
+     セーフエリアの余白を打ち消す（inset は画面全体に対する値のため） */
+  .categoriesArea,
+  .productsArea,
+  .numpadArea {
+    --safe-r: 0px;
+  }
+
+  .ticketArea {
+    --safe-l: 0px;
+  }
+}
+
+/* タブレット相当。レイアウトは変えず、各要素を大きくして余白を活かす */
+@media (min-width: 900px) {
+  .screen {
+    --tile-min: 168px;
+    --font-title: 1.5rem;
+    --pad: 1rem;
+  }
+}
+
+/*
+ * スマホ横向き。高さが 390px 前後しかないため、常時表示のテンキーを置くと
+ * 商品グリッドが 1〜2行しか見えなくなる。テンキーはトグルで開く
+ * オーバーレイに切り替え、その分の高さを商品グリッドに回す。
+ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .screen {
+    --tile-min: 108px;
+    --pad: 0.5rem;
   }
 }
 
@@ -47,14 +120,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  gap: 0.5rem;
+  padding: 0.75rem calc(1rem + var(--safe-r)) 0.75rem calc(1rem + var(--safe-l));
   background: #1f2937;
   color: #ffffff;
 }
 
 .headerTitle {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: var(--font-title);
+  white-space: nowrap;
+}
+
+/* 低背の横向きではヘッダーを詰めて、その分を商品グリッドに回す */
+@media (orientation: landscape) and (max-height: 560px) {
+  .header {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+
+  .headerTitle {
+    font-size: 1rem;
+  }
 }
 
 .headerNav {
@@ -79,7 +166,7 @@
 .categoryTabs {
   display: flex;
   gap: 0.625rem;
-  padding: 0.625rem 0.75rem;
+  padding: 0.625rem calc(0.75rem + var(--safe-r)) 0.625rem calc(0.75rem + var(--safe-l));
 }
 
 /*
@@ -116,14 +203,14 @@
 .productsArea {
   grid-area: productsArea;
   overflow-y: auto;
-  padding: 0.75rem;
+  padding: var(--pad) calc(var(--pad) + var(--safe-r)) var(--pad) calc(var(--pad) + var(--safe-l));
   min-height: 0;
 }
 
 .productGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr));
+  gap: var(--pad);
 }
 
 /*
@@ -141,7 +228,7 @@
   border: 1px solid rgba(17, 24, 39, 0.06);
   border-left: 4px solid transparent; /* 色は ProductGrid.tsx のインラインスタイルで指定 */
   border-radius: 14px;
-  padding: 0.75rem 0.875rem;
+  padding: var(--pad);
   text-align: left;
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.08),
@@ -174,7 +261,7 @@
 }
 
 .productPrice {
-  font-size: 1.5rem; /* 要件定義 7.3：金額表示は最低24pt。1.25rem(20px)だったため24px以上に修正（タスク20） */
+  font-size: var(--font-amount); /* 要件定義 7.3：金額表示は最低24pt。トークンの下限が 1.5rem(24px) */
   font-weight: 800;
   color: #111827;
   font-variant-numeric: tabular-nums;
@@ -182,12 +269,59 @@
 
 .numpadArea {
   grid-area: numpadArea;
+  position: relative; /* 収納式テンキー（.numpadPanel）の位置決めの基準 */
   border-top: 1px solid #d1d5db;
-  padding: 0.5rem;
+  padding: 0.5rem calc(0.5rem + var(--safe-r)) calc(0.5rem + var(--safe-b)) calc(0.5rem + var(--safe-l));
+}
+
+/*
+ * 収納式テンキーの開閉ボタン。既定（縦向き・タブレット横向き）ではテンキーを
+ * 常時表示するため出さない。
+ *
+ * トグルもテンキー本体も常に DOM に置き、表示の切り替えは CSS だけで行う。
+ * 条件レンダリングにすると画面の向きによって要素の有無が変わり、jsdom では
+ * メディアクエリが効かないため CheckoutScreen.test.tsx から見える DOM と
+ * 実機の DOM が食い違ってしまう。
+ */
+.numpadToggle {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.numpadPanel {
+  display: block;
 }
 
 .numpad {
   max-width: 320px;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .numpadToggle {
+    display: inline-flex;
+  }
+
+  .numpadPanel {
+    display: none;
+    position: absolute;
+    bottom: 100%; /* トグルの上（商品グリッドに重ねる形）に開く */
+    left: calc(0.5rem + var(--safe-l));
+    z-index: 5;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    padding: 0.5rem;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .numpadPanel[data-open='true'] {
+    display: block;
+  }
 }
 
 .numpadDisplay {
@@ -248,7 +382,18 @@
   flex-direction: column;
   min-height: 0;
   width: 100%;
-  padding: 0.75rem;
+  padding: var(--pad) calc(var(--pad) + var(--safe-r)) var(--pad) calc(var(--pad) + var(--safe-l));
+}
+
+/*
+ * 横向きでは伝票が右カラムとして画面下端まで届くため、ホームインジケータ分の
+ * 余白を足す（縦向きでは伝票は画面上部にあり不要）。この上書きは .ticketPanel
+ * の定義より後に置くこと（同じ詳細度のため、先に置くと打ち消される）。
+ */
+@media (orientation: landscape) {
+  .ticketPanel {
+    padding-bottom: calc(var(--pad) + var(--safe-b));
+  }
 }
 
 .ticketPanelTitle {
@@ -287,7 +432,7 @@
 }
 
 .ticketLineSubtotal {
-  font-size: 1.5rem; /* 要件定義 7.3：金額表示は最低24pt */
+  font-size: var(--font-amount); /* 要件定義 7.3：金額表示は最低24pt */
   font-variant-numeric: tabular-nums;
 }
 
@@ -359,7 +504,7 @@
 }
 
 .ticketTotalAmount {
-  font-size: 2.5rem; /* 要件定義 7.3：合計・釣銭は40pt以上 */
+  font-size: var(--font-total); /* 要件定義 7.3：合計・釣銭は40pt以上 */
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -385,7 +530,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1rem calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l));
   z-index: 10;
 }
 
@@ -395,11 +540,17 @@
   padding: 1rem;
   width: 100%;
   max-width: 420px;
-  max-height: 90vh;
+  max-height: 100%; /* オーバーレイ側の padding が確保済みのため 100% でよい */
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  .modal {
+    max-width: 520px;
+  }
 }
 
 .modalHeader {
@@ -422,7 +573,7 @@
 }
 
 .modalTotalAmount {
-  font-size: 1.5rem; /* 要件定義 7.3：金額表示は最低24pt */
+  font-size: var(--font-amount); /* 要件定義 7.3：金額表示は最低24pt */
   font-variant-numeric: tabular-nums;
 }
 
@@ -450,14 +601,14 @@
 }
 
 .changeAmount {
-  font-size: 2.5rem; /* 要件定義 7.3：合計・釣銭は40pt以上 */
+  font-size: var(--font-total); /* 要件定義 7.3：合計・釣銭は40pt以上 */
   font-variant-numeric: tabular-nums;
   font-weight: 800;
 }
 
 .receivedDisplay {
   text-align: center;
-  font-size: 1.5rem; /* 要件定義 7.3：金額表示は最低24pt */
+  font-size: var(--font-amount); /* 要件定義 7.3：金額表示は最低24pt */
   font-variant-numeric: tabular-nums;
   color: #374151;
 }

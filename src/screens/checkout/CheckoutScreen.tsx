@@ -49,6 +49,10 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
   const [numpadError, setNumpadError] = useState<string | null>(null)
   const [highlightedLineId, setHighlightedLineId] = useState<string | null>(null)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  // スマホ横向き（高さが低い横画面）でだけ使う収納式テンキーの開閉状態。
+  // 他のモードではテンキーが常時表示のため、この値は参照されない
+  // （表示の出し分けは CheckoutScreen.module.css のメディアクエリが行う）
+  const [numpadOpen, setNumpadOpen] = useState(false)
 
   // カテゴリが読み込まれたら、表示順が最初のものを既定選択にする
   useEffect(() => {
@@ -87,7 +91,12 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
 
   const handleNumpadSubmit = () => {
     if (!numpadValue) return
-    void handleAddProduct(Number(numpadValue)).then(() => setNumpadValue(''))
+    void handleAddProduct(Number(numpadValue)).then(() => {
+      setNumpadValue('')
+      // 収納式テンキー（スマホ横向き）は追加できたら閉じて商品グリッドに戻す。
+      // 常時表示のモードでは .numpadPanel の display を CSS が固定しているため影響しない
+      setNumpadOpen(false)
+    })
   }
 
   /**
@@ -149,7 +158,24 @@ export default function CheckoutScreen({ onNavigateToProducts, onNavigateToHisto
           </div>
 
           <div className={styles.numpadArea}>
-            <Numpad value={numpadValue} onChange={setNumpadValue} onSubmit={handleNumpadSubmit} error={numpadError} />
+            {/*
+              トグルとテンキー本体は常に DOM に置き、表示の出し分けは CSS の
+              メディアクエリに任せる（条件レンダリングにすると jsdom では
+              メディアクエリが効かず、テストから見える DOM と実機が食い違う）。
+              トグルが実際に見えるのはスマホ横向き相当のときだけ。
+            */}
+            <button
+              type="button"
+              className={styles.numpadToggle}
+              aria-expanded={numpadOpen}
+              aria-controls="numpad-panel"
+              onClick={() => setNumpadOpen((open) => !open)}
+            >
+              No. 入力{numpadValue && `（${numpadValue}）`}
+            </button>
+            <div id="numpad-panel" className={styles.numpadPanel} data-open={numpadOpen ? 'true' : 'false'}>
+              <Numpad value={numpadValue} onChange={setNumpadValue} onSubmit={handleNumpadSubmit} error={numpadError} />
+            </div>
           </div>
 
           <div className={styles.ticketArea}>
