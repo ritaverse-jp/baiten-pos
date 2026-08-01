@@ -42,14 +42,9 @@
   /* 縦積み時に伝票が伸び続けて商品グリッドを潰さないための上限 */
   --ticket-max: 42%;
 
-  /*
-   * index.html の viewport-fit=cover により、ノッチ／ホームインジケータの下にも
-   * 描画される。横向きの iPhone では左右どちらかにノッチが来るため、画面の縁に
-   * 接する要素はこのインセット分だけ内側に寄せる。
-   */
-  --safe-l: env(safe-area-inset-left, 0px);
-  --safe-r: env(safe-area-inset-right, 0px);
-  --safe-b: env(safe-area-inset-bottom, 0px);
+  /* --safe-l / --safe-r / --safe-b（セーフエリア）は index.css の :root で
+     定義したものを継承して使う。この画面では2カラム時に、画面の縁に接しなく
+     なった側だけを 0px で打ち消す（下の orientation: landscape ブロック） */
 
   display: grid;
   height: 100%;

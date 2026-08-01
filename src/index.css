@@ -10,6 +10,19 @@
   color: #111827;
   background-color: #f3f4f6;
   -webkit-text-size-adjust: 100%;
+
+  /*
+   * セーフエリアのインセット。index.html の viewport-fit=cover により、
+   * ノッチ／ホームインジケータの下にも描画されるため、画面の縁に接する要素は
+   * この分だけ内側に寄せる。横向きの iPhone では左右どちらかにノッチが来る。
+   *
+   * 全画面で使うためここ（:root）で一度だけ定義する。各画面の CSS Module は
+   * これを継承して使い、2カラムなどで画面の縁に接しなくなった要素だけが
+   * 自分自身に 0px を再定義して打ち消す（CheckoutScreen.module.css を参照）。
+   */
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
 }
 
 *,

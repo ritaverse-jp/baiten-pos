@@ -1,6 +1,12 @@
-/* SC-05 会計履歴（要件定義 FR-14・FR-15）。products/categories と共通のトーンで揃える */
+/*
+ * SC-05 会計履歴（要件定義 FR-14・FR-15）。products/categories と共通のトーンで揃える。
+ * 幅の上限・セーフエリアの扱いも ProductsScreen.module.css と同じにしてある。
+ */
 
 .screen {
+  /* ツールバー・通知・一覧の最大幅。ヘッダーには適用しない */
+  --content-max: 760px;
+
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -8,11 +14,12 @@
   background: #f3f4f6;
 }
 
+/* 画面の縁に接する要素はセーフエリア分だけ内側に寄せる（--safe-* は index.css の :root） */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem calc(1rem + var(--safe-r)) 0.75rem calc(1rem + var(--safe-l));
   background: #1f2937;
   color: #ffffff;
   gap: 0.5rem;
@@ -52,11 +59,17 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem calc(1rem + var(--safe-r)) 0.75rem calc(1rem + var(--safe-l));
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
 }
 
 .loadNotice {
-  margin: 0 1rem;
+  /* 一覧と左右を揃えるため、幅の上限と中央寄せは .list と同じにする */
+  width: calc(100% - 2rem - var(--safe-l) - var(--safe-r));
+  max-width: calc(var(--content-max) - 2rem);
+  margin-inline: auto;
   padding: 0.75rem;
   background: #fffbeb;
   color: #92400e;
@@ -67,10 +80,13 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  padding: 0 1rem 1rem;
+  padding: 0 calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
 }
 
 .row {

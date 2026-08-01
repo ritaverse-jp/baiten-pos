@@ -9,11 +9,12 @@
   overflow-y: auto;
 }
 
+/* 画面の縁に接する要素はセーフエリア分だけ内側に寄せる（--safe-* は index.css の :root） */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem calc(1rem + var(--safe-r)) 0.75rem calc(1rem + var(--safe-l));
   background: #1f2937;
   color: #ffffff;
   gap: 0.5rem;
@@ -53,14 +54,14 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
-  padding: 0.75rem 1rem 0;
+  padding: 0.75rem calc(1rem + var(--safe-r)) 0 calc(1rem + var(--safe-l));
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
 }
 
 .body {
-  padding: 1rem;
+  padding: 1rem calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l));
   display: flex;
   flex-direction: column;
   gap: 1rem;

@@ -1,6 +1,12 @@
-/* SC-04 カテゴリ管理（要件定義 FR-02）。SC-03 商品マスタ管理と共通のトーンで揃える */
+/*
+ * SC-04 カテゴリ管理（要件定義 FR-02）。SC-03 商品マスタ管理と共通のトーンで揃える。
+ * 幅の上限・セーフエリアの扱いも ProductsScreen.module.css と同じにしてある。
+ */
 
 .screen {
+  /* ツールバー・通知・一覧の最大幅。ヘッダーには適用しない */
+  --content-max: 760px;
+
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -8,11 +14,12 @@
   background: #f3f4f6;
 }
 
+/* 画面の縁に接する要素はセーフエリア分だけ内側に寄せる（--safe-* は index.css の :root） */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem calc(1rem + var(--safe-r)) 0.75rem calc(1rem + var(--safe-l));
   background: #1f2937;
   color: #ffffff;
   gap: 0.5rem;
@@ -52,33 +59,43 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem calc(1rem + var(--safe-r)) 0.75rem calc(1rem + var(--safe-l));
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+}
+
+.loadError,
+.offlineNotice {
+  /* 一覧と左右を揃えるため、幅の上限と中央寄せは .list と同じにする */
+  width: calc(100% - 2rem - var(--safe-l) - var(--safe-r));
+  max-width: calc(var(--content-max) - 2rem);
+  margin-inline: auto;
+  padding: 0.75rem;
+  border-radius: 8px;
 }
 
 .loadError {
-  margin: 0 1rem;
-  padding: 0.75rem;
   background: #fef2f2;
   color: #b91c1c;
-  border-radius: 8px;
 }
 
 .offlineNotice {
-  margin: 0 1rem;
-  padding: 0.75rem;
   background: #fffbeb;
   color: #92400e;
-  border-radius: 8px;
 }
 
 .list {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  padding: 0 1rem 1rem;
+  padding: 0 calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
 }
 
 .row {
@@ -125,7 +142,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1rem calc(1rem + var(--safe-r)) calc(1rem + var(--safe-b)) calc(1rem + var(--safe-l));
   z-index: 10;
 }
 
@@ -135,7 +152,7 @@
   padding: 1rem;
   width: 100%;
   max-width: 420px;
-  max-height: 90vh;
+  max-height: 100%; /* オーバーレイ側の padding が余白を確保済み */
   overflow-y: auto;
   display: flex;
   flex-direction: column;
