@@ -359,6 +359,11 @@ export type ServerErrorCode =
   | 'UNAUTHORIZED'
   | 'TOKEN_EXPIRED'
   | 'TERMINAL_DISABLED'
+  /**
+   * トークンは有効だが `端末` タブに該当行が無い。`TERMINAL_DISABLED`（管理者が
+   * 意図的に停止）と違い、端末側で登録をやり直せば復旧できる（docs/design.md 6.3）
+   */
+  | 'TERMINAL_NOT_REGISTERED'
   | 'LOCK_TIMEOUT'
   | 'VALIDATION_ERROR'
   | 'DUPLICATE_KEY'
@@ -562,8 +567,11 @@ export interface CancelSaleResponse {
  */
 export type ConnectionState = 'unknown' | 'online' | 'offline'
 
-/** 同期エンジンの停止理由。`disabled` は恒久停止（docs/design.md 6.6） */
-export type SyncBlockReason = 'tokenExpired' | 'terminalDisabled' | 'notConfigured'
+/**
+ * 同期エンジンの停止理由。`terminalDisabled` は恒久停止（docs/design.md 6.6）。
+ * `terminalNotRegistered` は端末側で登録をやり直せば復旧できる点が異なる。
+ */
+export type SyncBlockReason = 'tokenExpired' | 'terminalDisabled' | 'terminalNotRegistered' | 'notConfigured'
 
 export interface SyncState {
   connection: ConnectionState

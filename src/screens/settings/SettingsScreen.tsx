@@ -172,13 +172,28 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
    * GAS URL は残す。`config.terminalCode`/`apiToken` が無くなることで
    * `step` が自動的に `'register'` に戻り、登録ウィザードを最初からやり直せる。
    *
-   * トークンが端末タブの行と食い違って `TERMINAL_DISABLED` から抜け出せなく
-   * なった場合の復旧手段としても使う（登録済みのつもりが実際には端末タブに
-   * 行が無い状態になっていたケースがあったため用意した）。GAS 側のトークン
-   * 実体・端末タブの行はそのまま残るため、後片付けが必要な場合は別途行うこと。
+   * `端末` タブに行が無くなった端末（`TERMINAL_NOT_REGISTERED`）の復旧手段
+   * としても使う。GAS 側のトークン実体・端末タブの行はそのまま残るため、
+   * 後片付けが必要な場合は別途行うこと。
+   *
+   * **やり直すと新しい端末コードが割り当てられるため、未送信データは送信
+   * できなくなる**（GAS が認証済み端末と異なる terminalCode の売上を拒否する）。
+   * 呼び出し側は、未送信データがある場合に CSV での回収を先に促すこと。
    */
   const handleResetRegistration = async () => {
-    if (!window.confirm('この端末の登録情報を消去し、登録をやり直します。よろしいですか？')) return
+    // 未送信データの警告は、画面上の説明ではなくここ（実行の直前）に置く。
+    // リセットの入口が「端末情報」セクションと復旧導線の2箇所にあるため、
+    // 説明文の側だけに書くと、それを読まずにもう一方のボタンを押されうる。
+    //
+    // 件数は state の `pendingSales` ではなく**ここで読み直す**。この画面は
+    // マウント時にしか未送信一覧を読み込まないため、画面を開いたまま会計を
+    // 確定した場合などに state が古くなり、警告を出し損ねる
+    const pendingCount = (await getAllPendingSales()).length
+    const message =
+      pendingCount > 0
+        ? `未送信データが${pendingCount}件あります。\n\n登録をやり直すと新しい端末コードが割り当てられるため、この未送信データは送信できなくなります（CSV でダウンロードしてから実行してください）。\n\nこのまま登録をやり直しますか？`
+        : 'この端末の登録情報を消去し、登録をやり直します。よろしいですか？'
+    if (!window.confirm(message)) return
     await saveConfig({ terminalCode: null, terminalName: null, apiToken: null, tokenExpiresAt: null })
     useSyncStore.getState().setBlockedBy(null)
     setRegisterPin('')
@@ -386,6 +401,39 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 >
                   未送信データを CSV でダウンロード
                 </button>
+              </section>
+            )}
+
+            {/*
+              トークンは有効なのに `端末` タブに行が無い状態（design 6.3）。
+              管理者による無効化と違い、登録をやり直せば復旧できる。
+
+              ただし**登録し直すと新しい端末コードが割り当てられる**。未送信
+              データの payload は古い端末コードを持っており、GAS 側は認証済み
+              端末と異なる terminalCode の売上を受け付けない（gas/Sales.js）。
+              つまり登録をやり直した時点で、残っている未送信データは二度と
+              送信できなくなる。そのため CSV での回収を先に促す。
+            */}
+            {blockedBy === 'terminalNotRegistered' && (
+              <section className={styles.section}>
+                <div className={styles.warningBox}>
+                  この端末の登録情報がサーバー上に見つかりません。登録をやり直すと復旧できます。
+                </div>
+                {pendingSales.length > 0 ? (
+                  <>
+                    <div className={styles.warningBox}>
+                      <strong>先に未送信データ（{pendingSales.length}件）を CSV で保存してください。</strong>
+                      登録をやり直すと新しい端末コードが割り当てられるため、いま残っている未送信データは
+                      送信できなくなります。CSV をダウンロードし、管理者にシートへの反映を依頼してください。
+                      そのうえで、上の「登録をやり直す（リセット）」を押してください。
+                    </div>
+                    <button type="button" className={styles.primaryButton} onClick={handleExportCsv}>
+                      未送信データを CSV でダウンロード
+                    </button>
+                  </>
+                ) : (
+                  <p className={styles.emptyMessage}>上の「登録をやり直す（リセット）」から登録し直してください。</p>
+                )}
               </section>
             )}
 

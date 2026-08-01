@@ -88,9 +88,17 @@ function login(params) {
   verifyPin_(pin, terminalCode)
 
   var terminal = findTerminalRow_(terminalCode)
-  if (!terminal || terminal.status !== '有効') {
+  if (!terminal) {
+    // `端末` タブに行が無い。PIN が正しくても login では復旧できず、
+    // registerTerminal（設定画面の「登録をやり直す」）が必要なため別コードで返す
+    throw new ApiError(
+      'TERMINAL_NOT_REGISTERED',
+      'この端末の登録情報が見つかりません。設定画面から登録をやり直してください',
+    )
+  }
+  if (terminal.status !== '有効') {
     // 無効な端末は再ログインもできない（design 6.3）
-    throw new ApiError('TERMINAL_DISABLED', 'この端末は登録されていないか無効化されています')
+    throw new ApiError('TERMINAL_DISABLED', 'この端末は無効化されています')
   }
 
   var issued = issueToken_(terminalCode)

@@ -103,6 +103,13 @@ export async function runSync(options: RunSyncOptions = {}): Promise<void> {
       useSyncStore.getState().setBlockedBy('terminalDisabled')
       return
     }
+    if (result.error.code === 'TERMINAL_NOT_REGISTERED') {
+      // トークンは有効だが `端末` タブに行が無い。管理者による無効化と違い、
+      // 端末側で登録をやり直せば復旧できるため、設定画面がその導線を出す。
+      // 自動リトライしても状況は変わらないので、ここで停止する点は同じ
+      useSyncStore.getState().setBlockedBy('terminalNotRegistered')
+      return
+    }
 
     // NETWORK_ERROR・TIMEOUT・LOCK_TIMEOUT・VALIDATION_ERROR・MALFORMED_RESPONSE・
     // NOT_CONFIGURED 等は一時的な失敗として扱い、指数バックオフで次回へ（design 4.1）。

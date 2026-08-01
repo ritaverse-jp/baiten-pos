@@ -161,6 +161,20 @@ describe('design 6.6：TOKEN_EXPIRED / TERMINAL_DISABLED の分岐', () => {
     expect(await getAllPendingSales()).toHaveLength(1)
   })
 
+  test('TERMINAL_NOT_REGISTEREDはblockedByをterminalNotRegisteredにし、キューを保持する', async () => {
+    // 端末タブの行が失われた状態。管理者による無効化（terminalDisabled）とは
+    // 復旧手段が違うため、別の停止理由として区別する
+    await seedPendingSale('20260723-A001')
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ ok: false, error: { code: 'TERMINAL_NOT_REGISTERED', message: '登録情報が見つかりません' } }),
+    )
+
+    await runSync()
+
+    expect(useSyncStore.getState().blockedBy).toBe('terminalNotRegistered')
+    expect(await getAllPendingSales()).toHaveLength(1)
+  })
+
   test('blockedByが立っている間、force指定なしのrunSyncは通信しない', async () => {
     await seedPendingSale('20260723-A001')
     useSyncStore.setState({ blockedBy: 'tokenExpired' })

@@ -147,7 +147,17 @@ function requireAuth_(params) {
     throw new ApiError('TOKEN_EXPIRED', 'トークンの有効期限が切れています')
   }
 
-  if (getTerminalStatus_(terminalCode) !== '有効') {
+  var status = getTerminalStatus_(terminalCode)
+  if (status === TERMINAL_STATUS_NOT_REGISTERED) {
+    // トークンのハッシュ（Script Properties）は有効なのに `端末` タブに行が無い状態。
+    // 管理者による無効化とは復旧手段が違うため別コードで返す（設定画面が
+    // 「登録をやり直す」導線を出す）
+    throw new ApiError(
+      'TERMINAL_NOT_REGISTERED',
+      'この端末の登録情報が見つかりません。設定画面から登録をやり直してください',
+    )
+  }
+  if (status !== '有効') {
     throw new ApiError('TERMINAL_DISABLED', 'この端末は無効化されています')
   }
 
@@ -189,9 +199,16 @@ function findTerminalRow_(terminalCode) {
 
 /**
  * `端末` タブの状態を返す。60秒キャッシュする（design 6.4）。
- * タブが存在しない・該当コードの行がない場合は `無効` として扱う
- * （安全側に倒す。存在しない端末を有効扱いしない）。
+ *
+ * **「該当コードの行が無い」と「行はあるが状態が `無効`」を区別して返す。**
+ * どちらもアクセスは拒否する（存在しない端末を有効扱いしない）が、利用者から
+ * 見た意味と復旧手段が違う：前者は登録をやり直せば直り、後者は管理者が
+ * 意図的に止めているため利用者側では直せない。以前はどちらも `無効` に
+ * 畳んでいたため、`端末` タブの行が失われた端末が「無効化されています」と
+ * だけ表示され、復旧手段の無い行き止まりになっていた（2026-07-31 に実際に発生）。
  */
+var TERMINAL_STATUS_NOT_REGISTERED = '(未登録)'
+
 function getTerminalStatus_(terminalCode) {
   var cache = CacheService.getScriptCache()
   var cacheKey = TERMINAL_STATUS_CACHE_PREFIX + terminalCode
@@ -199,7 +216,7 @@ function getTerminalStatus_(terminalCode) {
   if (cached !== null) return cached
 
   var terminal = findTerminalRow_(terminalCode)
-  var status = terminal ? terminal.status : '無効'
+  var status = terminal ? terminal.status : TERMINAL_STATUS_NOT_REGISTERED
 
   cache.put(cacheKey, status, TERMINAL_STATUS_CACHE_SECONDS)
   return status

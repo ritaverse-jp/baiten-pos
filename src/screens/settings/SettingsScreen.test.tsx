@@ -342,3 +342,64 @@ describe('blockedBy: terminalDisabled（design 6.6）', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock')
   })
 })
+
+describe('blockedBy: terminalNotRegistered（端末タブの行が失われた状態）', () => {
+  beforeEach(async () => {
+    await saveConfig({
+      gasUrl: GAS_URL,
+      terminalCode: toTerminalCode('A'),
+      terminalName: 'レジ1',
+      apiToken: 'tok',
+      tokenExpiresAt: '2026-10-28T00:00:00+09:00',
+    })
+    useSyncStore.setState({ blockedBy: 'terminalNotRegistered', pendingCount: 0 })
+  })
+
+  test('登録情報が見つからない旨と、既存のリセット導線への案内を表示する', async () => {
+    render(<SettingsScreen onBack={() => {}} />)
+
+    await waitFor(() => expect(screen.getByText(/登録情報がサーバー上に見つかりません/)).toBeInTheDocument())
+    // リセットのボタンは「端末情報」セクションのものを使う（重複させない）
+    expect(screen.getByRole('button', { name: '登録をやり直す（リセット）' })).toBeInTheDocument()
+  })
+
+  test('未送信データが無ければCSVエクスポートは出さない', async () => {
+    render(<SettingsScreen onBack={() => {}} />)
+
+    await waitFor(() => expect(screen.getByText(/登録情報がサーバー上に見つかりません/)).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: '未送信データを CSV でダウンロード' })).not.toBeInTheDocument()
+  })
+
+  /*
+   * 登録をやり直すと新しい端末コードが割り当てられ、古い端末コードを持つ
+   * 未送信データは GAS 側で拒否されて二度と送れなくなる。そのため未送信が
+   * ある場合に限り、やり直す前の CSV 回収を促す必要がある
+   */
+  test('未送信データがある場合はCSVでの回収を先に促す', async () => {
+    await enqueuePendingSale(pendingSale('20260730-A001'))
+    render(<SettingsScreen onBack={() => {}} />)
+
+    await waitFor(() => expect(screen.getByText(/先に未送信データ（1件）を CSV で保存してください/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: '未送信データを CSV でダウンロード' })).toBeInTheDocument()
+  })
+
+  /*
+   * リセットの入口が2箇所（端末情報セクションと復旧導線）あるため、警告は
+   * 画面の説明文ではなく実行直前の確認ダイアログに置いている。説明を読まずに
+   * もう一方のボタンを押しても未送信データの消失に気づけるようにするため
+   */
+  test('未送信データがある状態でリセットすると、確認ダイアログが件数と影響を伝える', async () => {
+    const user = userEvent.setup()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    await enqueuePendingSale(pendingSale('20260730-A001'))
+    render(<SettingsScreen onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: '登録をやり直す（リセット）' })).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: '登録をやり直す（リセット）' }))
+
+    // afterEach で restoreAllMocks していないため vi.spyOn は既存スパイを
+    // 再利用し、mock.calls には前のテストの呼び出しも残る。直近の呼び出しを見る
+    expect(confirmSpy).toHaveBeenLastCalledWith(expect.stringContaining('未送信データが1件あります'))
+    expect(confirmSpy).toHaveBeenLastCalledWith(expect.stringContaining('送信できなくなります'))
+  })
+})

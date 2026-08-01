@@ -130,7 +130,8 @@ K 列の追加理由：再送や取消の突き合わせで「この会計の何
 { "ok": false, "error": { "code": "TERMINAL_DISABLED", "message": "..." } }
 ```
 
-- 主なエラーコード：`UNAUTHORIZED` / `TOKEN_EXPIRED` / `TERMINAL_DISABLED` / `LOCK_TIMEOUT` / `VALIDATION_ERROR` / `DUPLICATE_KEY` / `PIN_LOCKED`
+- 主なエラーコード：`UNAUTHORIZED` / `TOKEN_EXPIRED` / `TERMINAL_DISABLED` / `TERMINAL_NOT_REGISTERED` / `LOCK_TIMEOUT` / `VALIDATION_ERROR` / `DUPLICATE_KEY` / `PIN_LOCKED`
+- **`TERMINAL_DISABLED` と `TERMINAL_NOT_REGISTERED` は必ず区別する。** 前者は管理者が `端末` タブ D列で意図的に停止した状態で、端末側では復旧できない。後者はトークンのハッシュ（Script Properties）は有効なのに `端末` タブに該当行が無い状態で、端末側で登録をやり直せば復旧できる。両者を `TERMINAL_DISABLED` に畳んでいた当初の実装では、行が失われた端末が「無効化されています」と表示されるだけの行き止まりになっていた（2026-07-31 に実際に発生。経緯は CLAUDE.md 参照）
 
 ### 2.2 エンドポイント一覧
 
