@@ -11,7 +11,16 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { AppConfig, Category, PendingSale, Product, SaleRecord, SeqCounter, Ticket } from '@/domain/types'
+import type {
+  AppConfig,
+  CachedProductImage,
+  Category,
+  PendingSale,
+  Product,
+  SaleRecord,
+  SeqCounter,
+  Ticket,
+} from '@/domain/types'
 
 /**
  * `currentTicket` テーブルの主キー。
@@ -33,6 +42,7 @@ export class AppDatabase extends Dexie {
   pendingQueue!: EntityTable<PendingSale, 'saleId'>
   counters!: EntityTable<SeqCounter, 'dateKey'>
   config!: EntityTable<AppConfig, 'id'>
+  productImages!: EntityTable<CachedProductImage, 'imageId'>
 
   constructor() {
     super('baiten-pos')
@@ -46,6 +56,20 @@ export class AppDatabase extends Dexie {
       pendingQueue: 'saleId, enqueuedAt',
       counters: 'dateKey',
       config: 'id',
+    })
+    /*
+     * v2: 商品写真のキャッシュ（docs/design.md 9.4・タスク22）。
+     *
+     * Dexie は差分だけを書けばよく、ここに挙げていないテーブルは v1 の定義が
+     * そのまま引き継がれる。**v1 の宣言は消さないこと**——既存端末の
+     * IndexedDB を v1 から v2 へ移行するために必要。
+     *
+     * 主キーは画像ID。写真を差し替えると Drive のファイルIDが変わるため、
+     * ID が一致していれば中身も同じと言い切れる。これによりキャッシュの
+     * 失効判定そのものが不要になる（design 9.4）。
+     */
+    this.version(2).stores({
+      productImages: 'imageId',
     })
   }
 }

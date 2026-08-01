@@ -23,7 +23,10 @@ function getMasters(params) {
 
 function readProducts_() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PRODUCTS_SHEET_NAME)
-  return sheetRowsAfterHeader_(sheet, 6).map(function (row) {
+  // G列（画像ID）まで読む。画像の実体はここに含めない——`getMasters` は
+  // オフライン復帰時に必ず走る経路であり、重くすると同期全体が遅くなる
+  // （design 9.3）。端末は ID を見て未取得のぶんだけ別途取りに行く
+  return sheetRowsAfterHeader_(sheet, 7).map(function (row) {
     return {
       no: row[0],
       name: row[1],
@@ -31,6 +34,7 @@ function readProducts_() {
       categoryName: row[3],
       displayOrder: row[4] === '' ? null : row[4],
       status: row[5],
+      imageId: row[6] === '' ? null : row[6],
     }
   })
 }

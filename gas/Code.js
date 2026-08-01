@@ -52,6 +52,12 @@ function handleRequest_(e, method) {
         return respondOk_(saveProduct(params))
       case 'deleteProduct':
         return respondOk_(deleteProduct(params))
+      case 'saveProductImage':
+        return respondOk_(saveProductImage(params))
+      case 'deleteProductImage':
+        return respondOk_(deleteProductImage(params))
+      case 'getProductImage':
+        return respondOk_(getProductImage(params))
       case 'saveCategory':
         return respondOk_(saveCategory(params))
       case 'deleteCategory':

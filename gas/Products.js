@@ -43,6 +43,8 @@ function saveProduct(params) {
     }
 
     var before = targetRowIndex >= 0 ? rows[targetRowIndex] : null
+    // A〜F列のみを書く。**G列（画像ID）には触れない**——写真の登録は
+    // saveProductImage の担当であり、商品名や金額の編集で写真が消えては困る
     var rowValues = [product.no, product.name, product.price, product.categoryName, product.displayOrder, product.status]
 
     if (targetRowIndex >= 0) {
@@ -97,6 +99,10 @@ function deleteProduct(params) {
     var before = rows[targetIndex]
     sheet.deleteRow(targetIndex + 2)
 
+    // 行ごと消えるため、紐づいていた画像は参照されなくなる。放置すると
+    // Drive に孤児が溜まるのでここで破棄する（design 9.6）
+    trashImageQuietly_(before.imageId)
+
     logOperation_(terminalCode, '商品削除', '商品No.' + no, { before: before })
 
     return { no: no }
@@ -136,12 +142,12 @@ function validateProductInput_(product) {
   }
 }
 
-/** `商品マスタ` タブの全データ行を { no, name, price, categoryName, displayOrder, status } の配列で返す */
+/** `商品マスタ` タブの全データ行を { no, name, price, categoryName, displayOrder, status, imageId } の配列で返す */
 function productRows_(sheet) {
   var lastRow = sheet.getLastRow()
   if (lastRow < 2) return []
   return sheet
-    .getRange(2, 1, lastRow - 1, 6)
+    .getRange(2, 1, lastRow - 1, 7)
     .getValues()
     .map(function (row) {
       return {
@@ -151,6 +157,7 @@ function productRows_(sheet) {
         categoryName: row[3],
         displayOrder: row[4],
         status: row[5],
+        imageId: row[6] === '' ? null : row[6],
       }
     })
 }

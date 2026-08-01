@@ -121,6 +121,15 @@ export interface Product {
   displayOrder: number | null
   /** F列: 販売状態。`無効` は会計画面に表示しない */
   status: ActiveFlag
+  /**
+   * G列: 商品写真の Google Drive ファイルID（要件定義 6.2・docs/design.md 9章）。
+   *
+   * 写真は任意のため、`null`・`undefined`（列自体が無い古い行）はどちらも
+   * 「写真なし」を意味する。**画像の実体はここにも `getMasters` の応答にも
+   * 含めない。** 端末は ID を見て、未取得のぶんだけ `getProductImage` で
+   * 取りに行き `productImages` テーブルにキャッシュする（design 9.3・9.4）
+   */
+  imageId?: string | null
 }
 
 /** `カテゴリ` タブ 1 行（docs/design.md 1.3） */
@@ -498,6 +507,60 @@ export interface SaveProductResponse {
 
 export interface DeleteProductResponse {
   no: number
+}
+
+/*
+ * 商品写真（docs/design.md 9.3・タスク21）。フィールド名は gas/ProductImages.js と
+ * 一字一句合わせること。`imageBase64` は**データURLではなく生の Base64 文字列**
+ * （`data:image/jpeg;base64,` の接頭辞を含めない）。
+ */
+export interface SaveProductImageRequest extends AuthedRequest {
+  productNo: number
+  imageBase64: string
+  mimeType: string
+}
+
+export interface SaveProductImageResponse {
+  productNo: number
+  imageId: string
+}
+
+export interface DeleteProductImageRequest extends AuthedRequest {
+  productNo: number
+}
+
+export interface DeleteProductImageResponse {
+  productNo: number
+}
+
+export interface GetProductImageRequest extends AuthedRequest {
+  imageId: string
+}
+
+export interface GetProductImageResponse {
+  imageId: string
+  mimeType: string
+  imageBase64: string
+}
+
+/**
+ * `productImages` テーブル1件（docs/design.md 9.4）。主キーは画像ID。
+ *
+ * **画像の実体は `Blob` ではなく生バイト（`ArrayBuffer`）で持つ。**
+ * IndexedDB は仕様上 Blob を格納できるが、iOS Safari には格納した Blob が
+ * 後から読めなくなる既知の不具合があり、オフラインで確実に表示できることが
+ * 要件（9.1）の本アプリでは採れない。`mimeType` を併せ持ち、読み出し側で
+ * Blob を組み立て直す。
+ */
+export interface CachedProductImage {
+  /** `Product.imageId` と同じ Drive ファイルID */
+  imageId: string
+  /** 画像の生バイト */
+  bytes: ArrayBuffer
+  /** `image/jpeg` 等。Blob を組み立て直すのに使う */
+  mimeType: string
+  /** 取得日時（ISO8601）。デバッグ・古いキャッシュの調査用 */
+  fetchedAt: string
 }
 
 export interface SaveCategoryResponse {

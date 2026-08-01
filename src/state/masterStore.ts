@@ -15,6 +15,7 @@
 import { create } from 'zustand'
 import { getAllCategories, getAllProducts, replaceCategories, replaceProducts } from '@/data/db/masters'
 import { getMasters } from '@/data/gas/endpoints'
+import { syncProductImages } from '@/data/sync/productImages'
 import type { ApiResponse, Category, Product } from '@/domain/types'
 
 interface MasterStoreState {
@@ -54,6 +55,15 @@ export const useMasterStore = create<MasterStore>((set, get) => ({
     const result = await getMasters()
     if (!result.ok) return result
     await get().replace(result.data.products, result.data.categories)
+
+    /*
+     * 商品写真の取得はマスタ取得の成功後にバックグラウンドで行う
+     * （docs/design.md 9.4）。**await しない**——写真は補助表示であり、
+     * 取得を待って商品一覧の表示を遅らせてはならない（要件定義 9.1）。
+     * 失敗しても `syncProductImages` は例外を投げず、次回に持ち越す。
+     */
+    void syncProductImages(result.data.products)
+
     return { ok: true, data: undefined }
   },
 }))

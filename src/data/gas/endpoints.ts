@@ -19,9 +19,12 @@ import type {
   Category,
   DeleteCategoryRequest,
   DeleteCategoryResponse,
+  DeleteProductImageResponse,
   DeleteProductRequest,
   DeleteProductResponse,
   GetMastersResponse,
+  GetProductImageResponse,
+  SaveProductImageResponse,
   GetSalesHistoryRequest,
   GetSalesHistoryResponse,
   GetTodayMaxSeqResponse,
@@ -144,6 +147,53 @@ export async function deleteProduct(no: DeleteProductRequest['no']): Promise<Api
   const auth = await requireAuthedConfig()
   if (!auth) return notConfigured()
   return postToGas(auth.gasUrl, { action: 'deleteProduct', apiToken: auth.apiToken, terminalCode: auth.terminalCode, no })
+}
+
+/*
+ * 商品写真（docs/design.md 9.3・タスク21）。
+ *
+ * `imageBase64` は生の Base64 文字列で、`data:` 接頭辞を含めない。
+ * GAS 側（gas/ProductImages.js）は 200KB 相当を超える入力を拒否するため、
+ * 呼び出し側は送る前に端末側で縮小しておくこと（design 9.2）。
+ */
+export async function saveProductImage(
+  productNo: number,
+  imageBase64: string,
+  mimeType: string,
+): Promise<ApiResponse<SaveProductImageResponse>> {
+  const auth = await requireAuthedConfig()
+  if (!auth) return notConfigured()
+  return postToGas(auth.gasUrl, {
+    action: 'saveProductImage',
+    apiToken: auth.apiToken,
+    terminalCode: auth.terminalCode,
+    productNo,
+    imageBase64,
+    mimeType,
+  })
+}
+
+export async function deleteProductImage(productNo: number): Promise<ApiResponse<DeleteProductImageResponse>> {
+  const auth = await requireAuthedConfig()
+  if (!auth) return notConfigured()
+  return postToGas(auth.gasUrl, {
+    action: 'deleteProductImage',
+    apiToken: auth.apiToken,
+    terminalCode: auth.terminalCode,
+    productNo,
+  })
+}
+
+/** 1件ずつ取得する（design 9.3：全件まとめて返すと数MBになるため） */
+export async function getProductImage(imageId: string): Promise<ApiResponse<GetProductImageResponse>> {
+  const auth = await requireAuthedConfig()
+  if (!auth) return notConfigured()
+  return postToGas(auth.gasUrl, {
+    action: 'getProductImage',
+    apiToken: auth.apiToken,
+    terminalCode: auth.terminalCode,
+    imageId,
+  })
 }
 
 export async function saveCategory(category: Category, originalName?: string): Promise<ApiResponse<SaveCategoryResponse>> {
