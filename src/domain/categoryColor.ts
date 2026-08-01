@@ -99,6 +99,13 @@ export interface PaletteSwatch {
  * （`DEFAULT_PALETTE`）と全く同じ値を使う。**新しい色をここにだけ追加しない
  * こと**——「自動で付く色」と「手動で選べる色」を必ず一致させ、コントラスト
  * 未検証の色が紛れ込む余地をなくすための制約。
+ *
+ * コントラスト比は `pickReadableText` が黒／白の読みやすい方を自動で選ぶため、
+ * どんな色を足しても 4.5:1 は理論上保証される（上の関数コメント参照）。
+ * したがって追加時に確認すべきなのはコントラストではなく「隣の色と見分けが
+ * つくか」。**並びの末尾に追加すること**——`DEFAULT_PALETTE` は表示順の
+ * インデックスで割り当てるため、途中に挿入すると既存カテゴリに自動で付いて
+ * いた色がずれる。
  */
 export const PALETTE_SWATCHES: readonly PaletteSwatch[] = [
   { name: 'オレンジ', color: '#c2410c' },
@@ -109,6 +116,14 @@ export const PALETTE_SWATCHES: readonly PaletteSwatch[] = [
   { name: '黄土', color: '#a16207' },
   { name: 'ティール', color: '#0f766e' },
   { name: '赤', color: '#b91c1c' },
+  { name: '空', color: '#0369a1' },
+  { name: 'インディゴ', color: '#4338ca' },
+  { name: 'ライム', color: '#4d7c0f' },
+  { name: 'フクシア', color: '#a21caf' },
+  { name: '茶', color: '#78350f' },
+  { name: '深緑', color: '#065f46' },
+  { name: 'ローズ', color: '#9f1239' },
+  { name: 'スレート', color: '#334155' },
 ]
 
 /** `Category.color` が未設定のカテゴリに表示順で割り当てる既定パレット。`PALETTE_SWATCHES` から導出する（各エントリの 4.5:1 適合を categoryColor.test.ts で検証済み） */

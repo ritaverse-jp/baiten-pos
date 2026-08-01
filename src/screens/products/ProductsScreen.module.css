@@ -266,3 +266,19 @@
 .primaryButton:disabled {
   background: #9ca3af;
 }
+
+/*
+ * ヘッダーの「戻る」。className を付けていなかったため、index.css の
+ * button { color: inherit } でヘッダーの白文字を継承する一方、背景は
+ * ブラウザ既定の淡色のままになり文字が読めなくなっていた（要件定義7.3の
+ * コントラスト比4.5:1を割っていた）。背景を透過にして白文字を活かす。
+ * 文字色 #ffffff とヘッダー背景 #1f2937 のコントラスト比は 14.7:1。
+ */
+.backButton {
+  background: transparent;
+  border: 1px solid #6b7280;
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 0.25rem 0.75rem;
+  font-weight: 600;
+}

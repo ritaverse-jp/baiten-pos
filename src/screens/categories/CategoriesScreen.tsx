@@ -94,7 +94,7 @@ export default function CategoriesScreen({ onBack }: CategoriesScreenProps) {
     <main className={styles.screen}>
       <header className={styles.header}>
         <div className={styles.headerTitleGroup}>
-          <button type="button" onClick={onBack} aria-label="商品マスタ管理に戻る">
+          <button type="button" className={styles.backButton} onClick={onBack} aria-label="商品マスタ管理に戻る">
             戻る
           </button>
           <h1 className={styles.headerTitle}>カテゴリ管理</h1>

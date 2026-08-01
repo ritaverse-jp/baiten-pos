@@ -73,7 +73,7 @@ export default function HistoryScreen({ onBack }: HistoryScreenProps) {
     <main className={styles.screen}>
       <header className={styles.header}>
         <div className={styles.headerTitleGroup}>
-          <button type="button" onClick={onBack} aria-label="会計画面に戻る">
+          <button type="button" className={styles.backButton} onClick={onBack} aria-label="会計画面に戻る">
             戻る
           </button>
           <h1 className={styles.headerTitle}>会計履歴</h1>

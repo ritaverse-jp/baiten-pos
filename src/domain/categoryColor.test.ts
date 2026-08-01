@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { contrastRatio, resolveCategoryPalette } from './categoryColor'
+import { contrastRatio, PALETTE_SWATCHES, resolveCategoryPalette } from './categoryColor'
 import type { Category } from './types'
 
 const MIN_CONTRAST = 4.5 // 要件定義7.3「背景と文字のコントラスト比4.5:1以上を確保」
@@ -34,8 +34,14 @@ describe('resolveCategoryPalette', () => {
   })
 
   describe('要件定義7.3：全パレットがコントラスト比4.5:1以上を満たす', () => {
-    test('color未設定の8カテゴリすべて（既定パレットを一巡）でタブ・タイルとも4.5:1以上', () => {
-      const categories = Array.from({ length: 8 }, (_, i) => category({ name: `カテゴリ${i}`, displayOrder: i, color: null }))
+    // 件数は PALETTE_SWATCHES から導出する。パレットに色を足したとき、
+    // 追加分が検証されないまま通ってしまうのを防ぐため
+    const PALETTE_SIZE = PALETTE_SWATCHES.length
+
+    test('color未設定のカテゴリを既定パレット一巡ぶん並べても、タブ・タイルとも4.5:1以上', () => {
+      const categories = Array.from({ length: PALETTE_SIZE }, (_, i) =>
+        category({ name: `カテゴリ${i}`, displayOrder: i, color: null }),
+      )
 
       categories.forEach((c) => {
         const palette = resolveCategoryPalette(categories, c.name)
@@ -44,11 +50,21 @@ describe('resolveCategoryPalette', () => {
       })
     })
 
-    test('9件目（パレットが一巡して繰り返される）も4.5:1以上', () => {
-      const categories = Array.from({ length: 9 }, (_, i) => category({ name: `カテゴリ${i}`, displayOrder: i, color: null }))
-      const palette = resolveCategoryPalette(categories, 'カテゴリ8')
+    test('パレットが一巡して繰り返される件目も4.5:1以上', () => {
+      const categories = Array.from({ length: PALETTE_SIZE + 1 }, (_, i) =>
+        category({ name: `カテゴリ${i}`, displayOrder: i, color: null }),
+      )
+      const palette = resolveCategoryPalette(categories, `カテゴリ${PALETTE_SIZE}`)
       expect(contrastRatio(palette.tabBackground, palette.tabText)).toBeGreaterThanOrEqual(MIN_CONTRAST)
       expect(contrastRatio(palette.tileBackground, palette.tileText)).toBeGreaterThanOrEqual(MIN_CONTRAST)
+    })
+
+    test('スウォッチどうしが同じ色になっていない（見分けがつくこと）', () => {
+      const colors = PALETTE_SWATCHES.map((s) => s.color.toLowerCase())
+      expect(new Set(colors).size).toBe(colors.length)
+
+      const names = PALETTE_SWATCHES.map((s) => s.name)
+      expect(new Set(names).size).toBe(names.length)
     })
   })
 
