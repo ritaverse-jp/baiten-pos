@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { resizeImageFile, type ResizedImage } from '@/data/image/resize'
 import { PRODUCT_FORM_ERROR_MESSAGES, validateProductForm } from '@/domain/masters'
 import { toYen, type ActiveFlag, type Category, type Product } from '@/domain/types'
@@ -51,19 +51,12 @@ export default function ProductForm({
   const [status, setStatus] = useState<ActiveFlag>(product?.status ?? '有効')
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  // 写真（タスク23）。`imageAction` が確定した操作、`previewUrl` は選択直後の
-  // プレビュー用 object URL（登録済み写真の表示には currentImageUrl を使う）
+  // 写真（タスク23）。`imageAction` が確定した操作、`previewUrl` は選択した
+  // 写真の**縮小後**の data URL（登録済み写真の表示には currentImageUrl を使う）
   const [imageAction, setImageAction] = useState<ProductImageAction>({ type: 'keep' })
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
   const [resizing, setResizing] = useState(false)
-
-  // object URL は明示的に解放しないとメモリが残る。差し替え時と閉じる時に捨てる
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
-    }
-  }, [previewUrl])
 
   const handleSelectImage = async (file: File | undefined) => {
     if (!file) return
@@ -73,10 +66,14 @@ export default function ProductForm({
       // 送信前に必ず縮小する（design 9.2）。原寸のままだと GAS 側の上限にも掛かる
       const image = await resizeImageFile(file)
       setImageAction({ type: 'replace', image })
-      setPreviewUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous)
-        return URL.createObjectURL(file)
-      })
+      /*
+       * **プレビューには元ファイルではなく縮小後の画像を出す。**
+       * 元ファイルを表示すると、ブラウザが `<img>` 表示時に EXIF の回転を
+       * 自動適用したり透過をそのまま描いたりするため、「画面では正しいのに
+       * 保存された写真は回転している／透過部分が黒い」という食い違いを
+       * 見逃す。実際に送るものをそのまま見せる。
+       */
+      setPreviewUrl(`data:${image.mimeType};base64,${image.base64}`)
     } catch {
       setImageError('画像を読み込めませんでした。別の画像を選んでください')
     } finally {
@@ -87,10 +84,8 @@ export default function ProductForm({
   const handleRemoveImage = () => {
     setImageError(null)
     setImageAction({ type: 'remove' })
-    setPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous)
-      return null
-    })
+    // プレビューは data URL のため、object URL のような明示的な解放は不要
+    setPreviewUrl(null)
   }
 
   // 表示する写真：選択直後はプレビュー、未操作なら登録済み、削除操作後は無し

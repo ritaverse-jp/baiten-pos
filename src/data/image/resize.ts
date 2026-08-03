@@ -37,7 +37,17 @@ export interface ResizedImage {
  * 捕捉してユーザーにメッセージを出すこと。
  */
 export async function resizeImageFile(file: File | Blob): Promise<ResizedImage> {
-  const bitmap = await createImageBitmap(file)
+  /*
+   * `imageOrientation: 'from-image'` を明示する。
+   *
+   * スマートフォンで撮影した写真は、実際の画素は横向きのまま「EXIF に回転情報を
+   * 持たせる」形で保存されることが多い。`<img>` での表示はブラウザが自動で
+   * 回転を適用するが、**canvas に描くときは適用されるとは限らない**。既定値は
+   * 仕様上 'from-image' だが、ブラウザ・バージョンによって挙動が揺れてきた
+   * 経緯があるため、依存せず明示する。これを怠ると、画面では正しく見えるのに
+   * 保存された写真だけ横倒しになる。
+   */
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
 
   try {
     const scale = Math.min(1, MAX_IMAGE_EDGE_PX / Math.max(bitmap.width, bitmap.height))
