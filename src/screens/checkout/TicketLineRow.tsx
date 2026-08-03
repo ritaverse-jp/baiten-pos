@@ -3,6 +3,8 @@ import { lineSubtotal } from '@/domain/calc'
 import { formatYen } from '@/domain/format'
 import { isLastUnit, ticketErrorMessage } from '@/domain/ticket'
 import { LIMITS, type TicketLine } from '@/domain/types'
+import { useMasterStore } from '@/state/masterStore'
+import { useProductImageUrl } from '@/state/productImageUrls'
 import { useTicketStore } from '@/state/ticketStore'
 import styles from './CheckoutScreen.module.css'
 
@@ -25,6 +27,14 @@ export default function TicketLineRow({ line, highlighted }: TicketLineRowProps)
   const setLineDiscount = useTicketStore((s) => s.setLineDiscount)
   const splitLine = useTicketStore((s) => s.splitLine)
   const removeLine = useTicketStore((s) => s.removeLine)
+
+  /*
+   * 伝票行のサムネイル。`TicketLine` は確定時点の商品名・金額を持つが画像IDは
+   * 持たない（写真は表示の補助でしかなく、伝票の内容ではないため）。マスタから
+   * No. で引く。マスタから消えた商品・写真が未取得の場合は写真なしになる。
+   */
+  const imageId = useMasterStore((s) => s.products.find((p) => p.no === line.productNo)?.imageId)
+  const imageUrl = useProductImageUrl(imageId)
 
   const [discountDraft, setDiscountDraft] = useState(String(line.discount))
   const [discountError, setDiscountError] = useState<string | null>(null)
@@ -71,6 +81,12 @@ export default function TicketLineRow({ line, highlighted }: TicketLineRowProps)
   return (
     <li className={`${styles.ticketLine} ${highlighted ? styles.ticketLineHighlighted : ''}`}>
       <div className={styles.ticketLineHeader}>
+        {/*
+          写真が無い／未取得なら枠ごと出さない。空の四角が並ぶと見苦しく、
+          写真ありの行と混在したときに情報量が増えるだけになるため。
+          行の高さは写真の有無で変わらない（サムネイルより文字側が高い）
+        */}
+        {imageUrl && <img className={styles.ticketLineThumb} src={imageUrl} alt="" />}
         <span className={styles.ticketLineName}>{line.productName}</span>
         <span className={styles.ticketLineSubtotal}>{formatYen(lineSubtotal(line))}</span>
       </div>

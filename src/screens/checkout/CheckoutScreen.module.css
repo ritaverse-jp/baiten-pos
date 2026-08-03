@@ -420,6 +420,27 @@
 
 .ticketLineName {
   font-weight: 600;
+  /* 商品名が長いときに、サムネイルと金額を押し出さずここだけが縮むようにする */
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * 伝票行のサムネイル。40px 角（ユーザー合意値）。
+ * 写真が無い行では要素ごと描かないため、ここに「写真なし」の見た目は持たせない。
+ */
+.ticketLineThumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  /* 行は align-items: baseline（商品名と小計の文字を揃えるため）。画像を
+     baseline に載せると下端が文字のベースラインに揃って不格好になるので、
+     この要素だけ中央に置く */
+  align-self: center;
+  background: #ffffff;
+  border: 1px solid rgba(17, 24, 39, 0.1);
 }
 
 .ticketLineSubtotal {
