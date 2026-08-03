@@ -62,7 +62,9 @@ export const useMasterStore = create<MasterStore>((set, get) => ({
      * 取得を待って商品一覧の表示を遅らせてはならない（要件定義 9.1）。
      * 失敗しても `syncProductImages` は例外を投げず、次回に持ち越す。
      */
-    void syncProductImages(result.data.products)
+    // `syncProductImages` 自身が失敗を握り潰す設計だが、fire-and-forget で
+    // 呼ぶ以上、想定外の例外が未処理の Promise 拒否にならないよう受け止める
+    void syncProductImages(result.data.products).catch(() => {})
 
     return { ok: true, data: undefined }
   },

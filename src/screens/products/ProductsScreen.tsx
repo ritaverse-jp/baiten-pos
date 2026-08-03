@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { deleteProduct, saveProduct } from '@/data/gas/endpoints'
+import { getProductImageBlob } from '@/data/db/productImages'
+import { deleteProduct, deleteProductImage, saveProduct, saveProductImage } from '@/data/gas/endpoints'
 import { formatProductNo, formatYen } from '@/domain/format'
 import type { Product } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
 import { useSyncStore } from '@/state/syncStore'
-import ProductForm from './ProductForm'
+import ProductForm, { type ProductImageAction } from './ProductForm'
 import styles from './ProductsScreen.module.css'
 
 interface ProductsScreenProps {
@@ -34,6 +35,36 @@ export default function ProductsScreen({ onBack, onNavigateToCategories }: Produ
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  /** 編集中の商品に登録済みの写真（ローカルキャッシュ由来の object URL） */
+  const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null)
+
+  /*
+   * 編集フォームを開いたら、登録済みの写真をローカルキャッシュから読んで
+   * プレビュー用の object URL を作る。**GAS には取りに行かない**——
+   * `syncProductImages` が取得済みのはずで、未取得なら「写真なし」として
+   * 表示すればよい（要件定義 9.1：写真の取得可否で操作を止めない）。
+   */
+  useEffect(() => {
+    let revoked = false
+    let url: string | null = null
+
+    const imageId = editingProduct?.imageId
+    if (formOpen && imageId) {
+      void getProductImageBlob(imageId).then((blob) => {
+        if (!blob || revoked) return
+        url = URL.createObjectURL(blob)
+        setEditingImageUrl(url)
+      })
+    } else {
+      setEditingImageUrl(null)
+    }
+
+    return () => {
+      revoked = true
+      if (url) URL.revokeObjectURL(url)
+      setEditingImageUrl(null)
+    }
+  }, [formOpen, editingProduct])
 
   const load = async () => {
     setLoading(true)
@@ -61,19 +92,54 @@ export default function ProductsScreen({ onBack, onNavigateToCategories }: Produ
     setFormOpen(true)
   }
 
-  const handleSubmit = async (product: Product, originalNo?: number) => {
+  /**
+   * 商品の保存と写真の反映。
+   *
+   * **商品本体 → 写真 の順で送る。** GAS の `saveProductImage` は
+   * `商品マスタ` に該当行があることを前提とするため、新規追加では商品の保存が
+   * 成功していないと写真を送れない（design 9.3）。
+   *
+   * 写真の送信に失敗しても**商品自体の保存は取り消さない**。写真は任意項目で
+   * あり（要件定義 6.2）、商品が登録できていれば会計は行える。失敗はメッセージで
+   * 伝え、写真だけ後からやり直せる状態にする。
+   */
+  const handleSubmit = async (product: Product, imageAction: ProductImageAction, originalNo?: number) => {
     setSubmitting(true)
     const result = await saveProduct(product, originalNo)
     useSyncStore.getState().setConnection(result.ok ? 'online' : 'offline')
-    setSubmitting(false)
     if (!result.ok) {
+      setSubmitting(false)
       setSubmitError(result.error.message)
       return
     }
+
+    const imageError = await applyImageAction(product.no, imageAction)
+    setSubmitting(false)
+    if (imageError) {
+      // 商品は保存済み。一覧を最新化したうえでフォームは開いたままにし、
+      // 写真だけ再試行できるようにする
+      await load()
+      setSubmitError(`商品は保存しましたが、写真の反映に失敗しました：${imageError}`)
+      return
+    }
+
     // 一覧を最新化してからフォームを閉じる（先に閉じると、まだ古い一覧が
     // 一瞬見えてから更新される「ちらつき」が起きる）
     await load()
     setFormOpen(false)
+  }
+
+  /** 写真の操作を GAS に送る。成功なら null、失敗ならメッセージを返す */
+  const applyImageAction = async (no: number, action: ProductImageAction): Promise<string | null> => {
+    if (action.type === 'keep') return null
+
+    const result =
+      action.type === 'replace'
+        ? await saveProductImage(no, action.image.base64, action.image.mimeType)
+        : await deleteProductImage(no)
+
+    useSyncStore.getState().setConnection(result.ok ? 'online' : 'offline')
+    return result.ok ? null : result.error.message
   }
 
   const handleDelete = async (product: Product) => {
@@ -172,8 +238,9 @@ export default function ProductsScreen({ onBack, onNavigateToCategories }: Produ
           products={products}
           submitting={submitting}
           submitError={submitError}
+          currentImageUrl={editingImageUrl}
           onCancel={() => setFormOpen(false)}
-          onSubmit={(product, originalNo) => void handleSubmit(product, originalNo)}
+          onSubmit={(product, imageAction, originalNo) => void handleSubmit(product, imageAction, originalNo)}
         />
       )}
     </main>

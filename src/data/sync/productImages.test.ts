@@ -137,6 +137,36 @@ describe('1回あたりの取得枚数に上限を設ける', () => {
   })
 })
 
+/*
+ * この関数は `masterStore.refreshFromServer` から fire-and-forget で呼ばれる。
+ * 例外を投げると未処理の Promise 拒否になり、しかも残りの写真の取得まで
+ * 巻き添えで止まる。実際に実装当初はここで落ちていた
+ */
+describe('応答が壊れていても例外を投げない', () => {
+  test('imageBase64 が壊れていても、その1枚を諦めて次へ進む', async () => {
+    vi.mocked(fetch).mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      return body.imageId === 'img-壊れ'
+        ? jsonResponse({ ok: true, data: { imageId: 'img-壊れ', mimeType: 'image/jpeg', imageBase64: '!!!不正!!!' } })
+        : imageResponse(body.imageId)
+    })
+
+    const result = await syncProductImages([product(1, 'img-壊れ'), product(2, 'img-正常')])
+
+    expect(result.fetched).toBe(1)
+    expect(await getProductImageBlob('img-壊れ')).toBeUndefined()
+    expect(await getProductImageBlob('img-正常')).toBeDefined()
+  })
+
+  test('imageBase64 が欠けている応答でも例外を投げない', async () => {
+    vi.mocked(fetch).mockImplementation(async () =>
+      jsonResponse({ ok: true, data: { imageId: 'img-1', mimeType: 'image/jpeg' } }),
+    )
+
+    await expect(syncProductImages([product(1, 'img-1')])).resolves.toMatchObject({ fetched: 0 })
+  })
+})
+
 describe('base64ToBytes', () => {
   test('生のBase64をArrayBufferに変換する（data:接頭辞は含まない前提）', () => {
     const buffer = base64ToBytes('YWJj') // "abc"

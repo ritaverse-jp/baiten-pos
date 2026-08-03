@@ -68,8 +68,25 @@ export async function syncProductImages(products: readonly Product[]): Promise<S
       // ——写真なしとして表示できるため、リトライを急ぐ理由がない
       break
     }
-    await putProductImage(imageId, base64ToBytes(result.data.imageBase64), result.data.mimeType)
-    fetched += 1
+
+    /*
+     * **1枚の失敗で全体を止めない。**
+     *
+     * 応答が壊れている（`imageBase64` が文字列でない・Base64 として復号できない）
+     * 場合、`atob` は例外を投げる。この関数は fire-and-forget で呼ばれるため、
+     * ここで投げると未処理の Promise 拒否になり、しかも残りの写真の取得も
+     * 巻き添えで止まる。その1枚だけ諦めて次へ進む（写真なしとして表示される）。
+     */
+    try {
+      const { imageBase64, mimeType } = result.data
+      if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
+        throw new TypeError('imageBase64 が文字列ではありません')
+      }
+      await putProductImage(imageId, base64ToBytes(imageBase64), mimeType)
+      fetched += 1
+    } catch {
+      // 次回のマスタ取得で再試行される。写真は補助表示のため通知はしない
+    }
   }
 
   return { fetched, pruned, remaining: missing.length - fetched }

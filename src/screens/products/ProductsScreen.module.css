@@ -282,3 +282,76 @@
   padding: 0.25rem 0.75rem;
   font-weight: 600;
 }
+
+/*
+ * 写真の登録欄（タスク23）。プレビューは正方形に固定する——写真あり・なしが
+ * 混在してもフォームの高さが変わらないようにするため。
+ */
+.imageField {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.imagePreview,
+.imagePlaceholder {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  flex-shrink: 0;
+}
+
+.imagePreview {
+  object-fit: cover;
+  background: #ffffff;
+}
+
+.imagePlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.imageActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/*
+ * ファイル選択は input[type=file] を隠して label をボタンとして見せる。
+ * 素の input は端末ごとに見た目が大きく異なり、44×44pt の担保も効かないため。
+ * キーボード操作・スクリーンリーダーからは中の input が本体として扱われる。
+ */
+.imageSelectButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.imageSelectButton input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.imageMeta {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
