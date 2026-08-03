@@ -14,6 +14,7 @@ https://ritaverse-jp.github.io/baiten-pos/ （GitHub Pages。`main` への push 
 | --- | --- |
 | [docs/requirements.md](docs/requirements.md) | 要件定義書（仕様の正） |
 | [docs/design.md](docs/design.md) | 基本設計書（API・同期・認証・実装タスク一覧） |
+| [docs/manual.md](docs/manual.md) | 使い方ガイド（店舗の会計担当・管理者向け。そのまま配布できる内容） |
 | [CLAUDE.md](CLAUDE.md) | 実装時に守る不変条件 |
 
 ## セットアップ
