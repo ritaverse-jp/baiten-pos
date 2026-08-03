@@ -36,18 +36,38 @@ export interface ResizedImage {
  * 画像として読めないファイルを渡された場合は例外を投げる。呼び出し側で
  * 捕捉してユーザーにメッセージを出すこと。
  */
+/**
+ * 画像を `ImageBitmap` として読み込む。
+ *
+ * `imageOrientation: 'from-image'` を**指定できるなら指定する**。スマートフォンで
+ * 撮影した写真は、実際の画素は横向きのまま「EXIF に回転情報を持たせる」形で
+ * 保存されることが多く、`<img>` 表示ではブラウザが自動で回転を適用するが
+ * canvas に描くときは適用されるとは限らない。これを怠ると、画面では正しく
+ * 見えるのに保存された写真だけ横倒しになる。
+ *
+ * ただし **`'from-image'` は比較的新しい値で、未対応のブラウザは「不正な列挙値」
+ * として例外を投げる**（iOS Safari では通るのに PC ブラウザで写真を追加できない、
+ * という不具合が実際に出た）。指定できなければ既定の挙動にフォールバックする。
+ * その場合 EXIF の回転が反映されない可能性があるが、写真を一切登録できないより
+ * はるかにましである。
+ */
+async function loadBitmap(file: File | Blob): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch (err) {
+    // 画像そのものが壊れている場合もここに来るため、オプション指定をやめて
+    // もう一度だけ試す。それでも失敗するなら本当に読めない画像
+    if (err instanceof TypeError) return createImageBitmap(file)
+    throw err
+  }
+}
+
 export async function resizeImageFile(file: File | Blob): Promise<ResizedImage> {
-  /*
-   * `imageOrientation: 'from-image'` を明示する。
-   *
-   * スマートフォンで撮影した写真は、実際の画素は横向きのまま「EXIF に回転情報を
-   * 持たせる」形で保存されることが多い。`<img>` での表示はブラウザが自動で
-   * 回転を適用するが、**canvas に描くときは適用されるとは限らない**。既定値は
-   * 仕様上 'from-image' だが、ブラウザ・バージョンによって挙動が揺れてきた
-   * 経緯があるため、依存せず明示する。これを怠ると、画面では正しく見えるのに
-   * 保存された写真だけ横倒しになる。
-   */
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  if (typeof createImageBitmap !== 'function') {
+    throw new Error('このブラウザは画像の読み込み（createImageBitmap）に対応していません')
+  }
+
+  const bitmap = await loadBitmap(file)
 
   try {
     const scale = Math.min(1, MAX_IMAGE_EDGE_PX / Math.max(bitmap.width, bitmap.height))

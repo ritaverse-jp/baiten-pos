@@ -74,8 +74,15 @@ export default function ProductForm({
        * 見逃す。実際に送るものをそのまま見せる。
        */
       setPreviewUrl(`data:${image.mimeType};base64,${image.base64}`)
-    } catch {
-      setImageError('画像を読み込めませんでした。別の画像を選んでください')
+    } catch (err) {
+      /*
+       * 失敗の原因を画面に出す。当初は「読み込めませんでした」とだけ表示して
+       * いたが、ブラウザ依存の失敗（`createImageBitmap` のオプション非対応など）
+       * が起きたときに原因が全く分からず、実機での切り分けに時間を要した。
+       * 端末を触っている人がそのまま報告できる情報を出す。
+       */
+      const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+      setImageError(`画像を読み込めませんでした。別の画像を選んでください（${detail}）`)
     } finally {
       setResizing(false)
     }
