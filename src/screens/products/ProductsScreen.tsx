@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
-import { getProductImageBlob } from '@/data/db/productImages'
+import {
+  deleteProductImageFromCache,
+  getProductImageBlob,
+  putProductImage,
+  subscribeProductImages,
+} from '@/data/db/productImages'
 import { deleteProduct, deleteProductImage, saveProduct, saveProductImage } from '@/data/gas/endpoints'
+import { base64ToBytes } from '@/data/sync/productImages'
 import { formatProductNo, formatYen } from '@/domain/format'
 import type { Product } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
@@ -43,24 +49,36 @@ export default function ProductsScreen({ onBack, onNavigateToCategories }: Produ
    * プレビュー用の object URL を作る。**GAS には取りに行かない**——
    * `syncProductImages` が取得済みのはずで、未取得なら「写真なし」として
    * 表示すればよい（要件定義 9.1：写真の取得可否で操作を止めない）。
+   *
+   * **キャッシュの更新も購読する。** 写真の取得はバックグラウンドで走り
+   * GAS への往復を挟むため、フォームを開いた時点ではまだ手元に無いことが
+   * 普通にある。購読しないと「開いた瞬間に有ったものだけ」を表示して
+   * 固まってしまい、保存直後の写真がいつまでも出ない。
    */
   useEffect(() => {
-    let revoked = false
+    let disposed = false
     let url: string | null = null
 
     const imageId = editingProduct?.imageId
-    if (formOpen && imageId) {
-      void getProductImageBlob(imageId).then((blob) => {
-        if (!blob || revoked) return
-        url = URL.createObjectURL(blob)
-        setEditingImageUrl(url)
-      })
-    } else {
+    if (!formOpen || !imageId) {
       setEditingImageUrl(null)
+      return
     }
 
+    const read = async () => {
+      const blob = await getProductImageBlob(imageId)
+      if (disposed) return
+      if (url) URL.revokeObjectURL(url)
+      url = blob ? URL.createObjectURL(blob) : null
+      setEditingImageUrl(url)
+    }
+
+    void read()
+    const unsubscribe = subscribeProductImages(() => void read())
+
     return () => {
-      revoked = true
+      disposed = true
+      unsubscribe()
       if (url) URL.revokeObjectURL(url)
       setEditingImageUrl(null)
     }
@@ -129,17 +147,45 @@ export default function ProductsScreen({ onBack, onNavigateToCategories }: Produ
     setFormOpen(false)
   }
 
-  /** 写真の操作を GAS に送る。成功なら null、失敗ならメッセージを返す */
+  /**
+   * 写真の操作を GAS に送る。成功なら null、失敗ならメッセージを返す。
+   *
+   * **成功したら、その場でローカルキャッシュにも反映する。** 送った画像の
+   * バイト列は手元にあるので、`syncProductImages` の取得（GAS への往復が
+   * 1枚あたり数秒かかる）を待つ理由がない。これを待つ作りだったために、
+   * 保存直後にフォームを開き直しても写真が出ない状態になっていた。
+   */
   const applyImageAction = async (no: number, action: ProductImageAction): Promise<string | null> => {
     if (action.type === 'keep') return null
 
-    const result =
-      action.type === 'replace'
-        ? await saveProductImage(no, action.image.base64, action.image.mimeType)
-        : await deleteProductImage(no)
+    if (action.type === 'remove') {
+      const removed = await deleteProductImage(no)
+      useSyncStore.getState().setConnection(removed.ok ? 'online' : 'offline')
+      if (!removed.ok) return removed.error.message
+      const imageId = editingProduct?.imageId
+      if (imageId) await deleteProductImageFromCache(imageId)
+      return null
+    }
 
-    useSyncStore.getState().setConnection(result.ok ? 'online' : 'offline')
-    return result.ok ? null : result.error.message
+    const saved = await saveProductImage(no, action.image.base64, action.image.mimeType)
+    useSyncStore.getState().setConnection(saved.ok ? 'online' : 'offline')
+    if (!saved.ok) return saved.error.message
+
+    /*
+     * ローカルへの反映は「あくまで往復を省くための先回り」。応答に imageId が
+     * 無い等でここが失敗しても、写真自体は保存できている（＝画面としては成功）
+     * ため、保存の成否には影響させない。次回のマスタ取得で
+     * `syncProductImages` が正規の経路で取り直す
+     */
+    const imageId = saved.data?.imageId
+    if (typeof imageId === 'string' && imageId.length > 0) {
+      try {
+        await putProductImage(imageId, base64ToBytes(action.image.base64), action.image.mimeType)
+      } catch {
+        // 先回りに失敗しただけ。次回のマスタ取得で取り直される
+      }
+    }
+    return null
   }
 
   const handleDelete = async (product: Product) => {

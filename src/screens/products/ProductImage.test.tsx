@@ -12,7 +12,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { saveConfig } from '@/data/db/config'
-import { putProductImage } from '@/data/db/productImages'
+import { getProductImageBlob, putProductImage } from '@/data/db/productImages'
 import { db } from '@/data/db/schema'
 import { toTerminalCode, toYen, type Category, type Product } from '@/domain/types'
 import { useMasterStore } from '@/state/masterStore'
@@ -80,7 +80,18 @@ afterEach(() => {
  * 新しい Response を作ること。
  */
 async function openEditForm(user: ReturnType<typeof userEvent.setup>, product: Product) {
-  vi.mocked(fetch).mockImplementation(async () => mastersResponse([product]))
+  vi.mocked(fetch).mockImplementation(async (_url, init) => {
+    const body = JSON.parse((init as RequestInit).body as string)
+    // saveProductImage は保存後にローカルキャッシュへ先回りで書くため、
+    // 実際と同じ形（imageId を含む）で応答させる必要がある
+    if (body.action === 'saveProductImage') {
+      return jsonResponse({ ok: true, data: { productNo: body.productNo, imageId: 'img-新規' } })
+    }
+    if (body.action === 'deleteProductImage') {
+      return jsonResponse({ ok: true, data: { productNo: body.productNo } })
+    }
+    return mastersResponse([product])
+  })
   render(<ProductsScreen onBack={() => {}} onNavigateToCategories={() => {}} />)
   await waitFor(() => expect(screen.getByText('からあげ串')).toBeInTheDocument())
   await user.click(screen.getByRole('button', { name: /からあげ串.*編集|編集/ }))
@@ -185,6 +196,58 @@ describe('登録済みの写真', () => {
 
     expect(screen.getByText('なし')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '保存' })).not.toBeDisabled()
+  })
+})
+
+/*
+ * 実機で「保存は成功しているのにプレビューに写真が出ない」という不具合が出た。
+ * 原因は取得の失敗ではなく、**画面がキャッシュ更新の契機を持っていなかった**こと。
+ * 写真の取得はバックグラウンドで GAS への往復を挟むため、フォームを開いた
+ * 時点ではまだ手元に無いのが普通で、その後に届いても画面が知る術がなかった。
+ */
+describe('キャッシュがあとから埋まった場合（実機で出た不具合の回帰テスト）', () => {
+  test('フォームを開いた後にキャッシュへ届いた写真がプレビューに出る', async () => {
+    const user = userEvent.setup()
+    await openEditForm(user, WITH_IMAGE) // キャッシュは空の状態で開く
+
+    expect(screen.getByText('なし')).toBeInTheDocument()
+
+    // バックグラウンドの取得が完了した状況を再現する
+    await putProductImage('img-1', new TextEncoder().encode('あとから').buffer as ArrayBuffer, 'image/jpeg')
+
+    await waitFor(() => expect(screen.getByAltText('商品写真のプレビュー')).toBeInTheDocument())
+  })
+})
+
+describe('保存直後のプレビュー（GASからの再取得を待たない）', () => {
+  /*
+   * 送った画像のバイト列は手元にあるので、`syncProductImages` の取得
+   * （1枚あたり GAS への往復で数秒）を待つ理由がない。待つ作りだったために
+   * 保存直後にフォームを開き直しても写真が出なかった
+   */
+  test('保存に成功したら、その場でローカルキャッシュにも書く', async () => {
+    const user = userEvent.setup()
+    await openEditForm(user, KARAAGE)
+
+    await user.upload(screen.getByLabelText('写真（任意）'), imageFile())
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(sentActions()).toContain('saveProductImage'))
+    // GAS が返した imageId で、送ったバイト列がそのままキャッシュされている
+    await waitFor(async () => expect(await getProductImageBlob('img-新規')).toBeDefined())
+  })
+
+  test('写真を削除したらローカルキャッシュからも消える', async () => {
+    const user = userEvent.setup()
+    await putProductImage('img-1', new TextEncoder().encode('画像').buffer as ArrayBuffer, 'image/jpeg')
+    await openEditForm(user, WITH_IMAGE)
+    await waitFor(() => expect(screen.getByRole('button', { name: '写真を削除' })).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: '写真を削除' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(sentActions()).toContain('deleteProductImage'))
+    await waitFor(async () => expect(await getProductImageBlob('img-1')).toBeUndefined())
   })
 })
 

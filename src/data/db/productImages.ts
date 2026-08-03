@@ -13,6 +13,29 @@
 import type { CachedProductImage } from '@/domain/types'
 import { db } from './schema'
 
+/*
+ * キャッシュの更新通知。
+ *
+ * 写真の取得は `syncProductImages` がバックグラウンドで行い、GAS への往復を
+ * 挟むため**画面を描いた後に完了する**。これを知らせる手段が無いと、画面は
+ * 「開いた瞬間にキャッシュに有ったものだけ」を表示して固まってしまう
+ * （実際にこれで、保存直後の写真がプレビューに出ない不具合になった）。
+ *
+ * Zustand ストアにせずここに置くのは、`data/db/` を `state/` に依存させない
+ * ため（design 3.2 の層の分け方）。購読側は変更を知って読み直すだけでよい。
+ */
+const listeners = new Set<() => void>()
+
+/** キャッシュが変化したときに呼ばれる。戻り値は購読解除関数 */
+export function subscribeProductImages(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+function notifyChanged(): void {
+  for (const listener of listeners) listener()
+}
+
 /**
  * 1件取得し、表示に使える `Blob` に組み立てて返す。未取得なら `undefined`
  * （＝写真なしとして扱う）。保存は生バイトで行っている（`CachedProductImage`
@@ -38,6 +61,7 @@ export async function putProductImage(
 ): Promise<void> {
   const record: CachedProductImage = { imageId, bytes, mimeType, fetchedAt: now.toISOString() }
   await db.productImages.put(record)
+  notifyChanged()
 }
 
 /**
@@ -50,10 +74,18 @@ export async function deleteUnreferencedImages(referencedIds: ReadonlySet<string
   if (orphans.length === 0) return 0
 
   await db.productImages.bulkDelete(orphans)
+  notifyChanged()
   return orphans.length
+}
+
+/** 1件削除。写真を消したときにローカルからも即座に消すのに使う */
+export async function deleteProductImageFromCache(imageId: string): Promise<void> {
+  await db.productImages.delete(imageId)
+  notifyChanged()
 }
 
 /** 全削除。端末登録のリセット等でキャッシュを捨てたい場合に使う */
 export async function clearProductImages(): Promise<void> {
   await db.productImages.clear()
+  notifyChanged()
 }
