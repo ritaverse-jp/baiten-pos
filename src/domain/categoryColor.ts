@@ -21,6 +21,11 @@ export interface CategoryPalette {
   tileBackground: string
   /** 商品ボタンの文字色（`tileBackground` に対して 4.5:1 以上を保証） */
   tileText: string
+  /**
+   * 商品写真の上に文字を載せるときに、文字の背後へ敷く下地（`rgba(...)`）。
+   * 写真がどんな色でも `tileText` との 4.5:1 を保証する（`PHOTO_SCRIM_ALPHA` 参照）
+   */
+  photoScrim: string
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -79,12 +84,43 @@ function mixWithWhite(hex: string, ratio: number): string {
 const TILE_WHITE_MIX_RATIO = 0.85
 const TILE_TEXT = '#111827'
 
+/**
+ * 商品写真の上に文字を載せるとき、文字の背後へ敷く白い下地の不透明度
+ * （タスク24：商品タイルへの写真表示）。
+ *
+ * 写真は管理者が自由に登録するため、色を事前に知ることができない。文字を
+ * 直接重ねると要件定義 7.3 のコントラスト比 4.5:1 を保証できないので、
+ * **不透明度の下限を決めて機械的に保証する**。
+ *
+ * 最悪ケースは写真が純黒のとき。白を不透明度 a で重ねた結果は各チャンネル
+ * `a × 255` になるため、a が決まれば下地の色が一意に定まり、`TILE_TEXT` との
+ * コントラスト比を計算できる。0.5 付近で 4.5:1 を割るため、写真の見え方と
+ * 両立する範囲で余裕を持たせて 0.88 とした（この値での実際の比は
+ * `categoryColor.test.ts` で検証している）。
+ *
+ * **この値を下げるときは必ずテストで 4.5:1 を満たすことを確認すること。**
+ */
+export const PHOTO_SCRIM_ALPHA = 0.88
+
+const PHOTO_SCRIM = `rgba(255, 255, 255, ${PHOTO_SCRIM_ALPHA})`
+
+/**
+ * 白の下地を `alpha` で敷いたとき、下にどんな写真があっても保証される
+ * 最悪ケースのコントラスト比を返す（最悪＝写真が純黒のとき）。
+ */
+export function worstCaseScrimContrast(alpha: number, textHex: string = TILE_TEXT): number {
+  const channel = alpha * 255
+  const darkest = `#${toHex(channel)}${toHex(channel)}${toHex(channel)}`
+  return contrastRatio(darkest, textHex)
+}
+
 function paletteFromColor(color: string): CategoryPalette {
   return {
     tabBackground: color,
     tabText: pickReadableText(color),
     tileBackground: mixWithWhite(color, TILE_WHITE_MIX_RATIO),
     tileText: TILE_TEXT,
+    photoScrim: PHOTO_SCRIM,
   }
 }
 
@@ -135,6 +171,7 @@ const NEUTRAL_PALETTE: CategoryPalette = {
   tabText: '#111827',
   tileBackground: '#ffffff',
   tileText: '#111827',
+  photoScrim: PHOTO_SCRIM,
 }
 
 /**

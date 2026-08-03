@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { contrastRatio, PALETTE_SWATCHES, resolveCategoryPalette } from './categoryColor'
+import {
+  contrastRatio,
+  PALETTE_SWATCHES,
+  PHOTO_SCRIM_ALPHA,
+  resolveCategoryPalette,
+  worstCaseScrimContrast,
+} from './categoryColor'
 import type { Category } from './types'
 
 const MIN_CONTRAST = 4.5 // 要件定義7.3「背景と文字のコントラスト比4.5:1以上を確保」
@@ -57,6 +63,36 @@ describe('resolveCategoryPalette', () => {
       const palette = resolveCategoryPalette(categories, `カテゴリ${PALETTE_SIZE}`)
       expect(contrastRatio(palette.tabBackground, palette.tabText)).toBeGreaterThanOrEqual(MIN_CONTRAST)
       expect(contrastRatio(palette.tileBackground, palette.tileText)).toBeGreaterThanOrEqual(MIN_CONTRAST)
+    })
+
+    /*
+     * 商品タイルに写真を敷くと、文字の背景が「管理者が登録した任意の画像」に
+     * なる。色を事前に知れないため、文字の背後に不透明な下地を敷いて
+     * コントラストを保証する（タスク24）。最悪ケースは写真が純黒のとき
+     */
+    test('写真の下地は、写真が純黒でも4.5:1以上を満たす', () => {
+      expect(worstCaseScrimContrast(PHOTO_SCRIM_ALPHA)).toBeGreaterThanOrEqual(MIN_CONTRAST)
+    })
+
+    test('全パレットが写真用の下地を持ち、その下地でも4.5:1以上', () => {
+      const categories = Array.from({ length: PALETTE_SWATCHES.length }, (_, i) =>
+        category({ name: `カテゴリ${i}`, displayOrder: i, color: null }),
+      )
+
+      categories.forEach((c) => {
+        const palette = resolveCategoryPalette(categories, c.name)
+        expect(palette.photoScrim).toMatch(/^rgba\(255, 255, 255, /)
+        // 下地は白のみ（カテゴリ色を混ぜない）。混ぜると色ごとに保証が変わる
+        expect(worstCaseScrimContrast(PHOTO_SCRIM_ALPHA, palette.tileText)).toBeGreaterThanOrEqual(MIN_CONTRAST)
+      })
+    })
+
+    /*
+     * 不透明度を下げると写真はよく見えるが、あるところで 4.5:1 を割る。
+     * 「下げるときは必ずテストで確認する」という制約を、テスト自体で示しておく
+     */
+    test('不透明度を0.5まで下げると4.5:1を割る（下限の存在を明示する）', () => {
+      expect(worstCaseScrimContrast(0.5)).toBeLessThan(MIN_CONTRAST)
     })
 
     test('スウォッチどうしが同じ色になっていない（見分けがつくこと）', () => {

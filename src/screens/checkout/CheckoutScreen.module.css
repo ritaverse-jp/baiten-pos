@@ -220,6 +220,9 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 0.25rem;
+  /* 写真を絶対配置で敷くための基準。角丸からはみ出さないよう切り抜く */
+  position: relative;
+  overflow: hidden;
   background: #ffffff;
   border: 1px solid rgba(17, 24, 39, 0.06);
   border-left: 4px solid transparent; /* 色は ProductGrid.tsx のインラインスタイルで指定 */
@@ -239,10 +242,56 @@
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
 }
 
+/*
+ * 商品写真（タスク24）。**タイルの寸法には一切影響させない。**
+ * 絶対配置でタイル全面に敷き、写真の有無で高さが変わらないようにする
+ * （変わると写真あり・なしが混在したときに一覧の行が揃わない）。
+ */
+.productPhoto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+/*
+ * 文字のまとまり。写真の上に載るため、写真より前面に置く
+ * （絶対配置の .productPhoto は既定で静的な兄弟より前に描かれるため、
+ *  こちら側にも position と z-index が要る）。
+ */
+.productText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * 写真がある場合だけ、文字の背後に下地を敷く。色（不透明度）は
+ * `domain/categoryColor.ts` の `photoScrim` が決める——写真の色は事前に
+ * 分からないため、要件定義7.3のコントラスト比4.5:1をあの計算で保証している。
+ *
+ * **padding と同じ値の負の margin を付けて、レイアウトへの寄与を 0 にしている。**
+ * 下地は文字より一回り大きく見えるが、タイルの高さ・幅は写真が無いときと
+ * 完全に同じになる。
+ */
+.productTextScrim {
+  padding: 0.25rem 0.5rem;
+  margin: -0.25rem -0.5rem;
+  border-radius: 8px;
+}
+
 .productNo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 写真より前面に置く（.productText と同じ理由） */
+  position: relative;
+  z-index: 1;
   min-width: 1.75rem;
   height: 1.75rem;
   padding: 0 0.375rem;
